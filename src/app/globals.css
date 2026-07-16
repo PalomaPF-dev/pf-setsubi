@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* サイドバーを常時表示する条件：幅が広く かつ 高さも十分（=タブレット/PC）。
+   横向きスマホ（高さが低い）は対象外＝ドロワー（☰）に自動で隠す。 */
+@custom-variant wide (@media (min-width: 768px) and (min-height: 600px));
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+    "Hiragino Sans", Meiryo, Arial, sans-serif;
+}
+
+/* 印刷時：画面用UI（サイドバー等）を隠して帳票を全ページ印刷する */
+@media print {
+  .no-print { display: none !important; }
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  /* AppShell の h-screen/overflow-hidden を解除して全行を印刷 */
+  .print-root { height: auto !important; overflow: visible !important; display: block !important; }
+  .print-main { height: auto !important; overflow: visible !important; }
+  /* 用紙サイズ（@page）は印刷ルートごとに各ページ内の <style> で指定する：
+     台帳=A4横（/equipment/print）、ラベル=テプラ実寸（/equipment/[id]/label）。
+     こうすると 1 印刷ジョブに 1 つの @page だけが効き、ブラウザ間でも衝突しない。 */
+  /* 見出し帯・ゼブラ縞の背景色を、印刷の既定設定でも再現する */
+  .print-table thead tr,
+  .print-table tbody tr:nth-child(even) {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* 行がページ境界で分断されないように、見出し行は各ページ先頭で繰り返す */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+}

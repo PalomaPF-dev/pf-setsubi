@@ -1,0 +1,74 @@
+# =============================================================================
+# スマコウバ設備 オンプレ版 docker-compose
+#   db   : PostgreSQL 16（データは named volume db-data に永続化）
+#   app  : Next.js アプリ本体（http://<SERVER_HOST>:8080 で公開）
+#   cron : 点検期限アラートを毎日実行するサイドカー（app と同じイメージ）
+# 事前に `cp .env.onprem.example .env` して値を設定してください。
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: setsubi
+      POSTGRES_USER: setsubi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U setsubi -d setsubi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # 通常はホストへ公開しない（app からは compose ネットワーク内 db:5432 で接続）。
+    # ホストからバックアップツール等で直接つなぎたい場合のみ以下を開ける:
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  app:
+    build: .
+    image: sumakouba-setsubi:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:3000"
+    volumes:
+      - uploads:/data/uploads
+    environment:
+      DATABASE_URL: postgresql://setsubi:${POSTGRES_PASSWORD}@db:5432/setsubi
+      ON_PREMISE: "1"
+      STORAGE_DRIVER: local
+      STORAGE_DIR: /data/uploads
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?}
+      NEXTAUTH_URL: http://${SERVER_HOST:?}:8080
+      CRON_SECRET: ${CRON_SECRET:?}
+      ALERT_LEAD_DAYS: "30,7,1"
+      MAIL_DRIVER: smtp
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: "${SMTP_SECURE:-0}"
+      MAIL_FROM: "${MAIL_FROM:-設備管理 <setsubi@example.co.jp>}"
+      TZ: Asia/Tokyo
+
+  cron:
+    image: sumakouba-setsubi:latest
+    restart: unless-stopped
+    depends_on:
+      - app
+    # busybox crond の実行に root が必要（アプリは動かさず wget を叩くだけ）
+    user: root
+    environment:
+      CRON_SECRET: ${CRON_SECRET:?}
+      TZ: Asia/Tokyo
+    volumes:
+      - ./docker/cron/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+
+volumes:
+  db-data:
+  uploads:

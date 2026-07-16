@@ -1,0 +1,27 @@
+# 依存・ビルド成果物（イメージ内で入れ直す）
+node_modules
+.next
+tsconfig.tsbuildinfo
+
+# iOS / Capacitor 関連（オンプレ版では不要）
+ios
+capacitor-shell
+capacitor.config.ts
+assets
+
+# ローカルデータ・秘密情報
+data
+.env*
+!.env.onprem.example
+
+# クラウド・ツール設定
+.vercel
+.claude
+.git
+.gitignore
+
+# Docker 関連自身（ビルドコンテキストに不要）
+Dockerfile
+docker-compose.yml
+.dockerignore
+README-onprem.md
