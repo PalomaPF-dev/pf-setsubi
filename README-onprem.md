@@ -241,4 +241,4 @@ setsubi.example.co.jp {
 
 ---
 
-運営: Paloma運営事務局
+運営: Paloma

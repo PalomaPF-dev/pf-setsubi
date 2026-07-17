@@ -48,4 +48,4 @@ inspection_items/equipment_procedures/inspection_records/inspection_item_results
 
 ## 運営
 
-Paloma運営事務局
+Paloma
