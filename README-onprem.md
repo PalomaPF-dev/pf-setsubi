@@ -142,10 +142,10 @@ cron コンテナの実行履歴は `docker compose logs -f cron` で確認で�
 docker compose exec db pg_dump -U setsubi setsubi > backup-$(date +%Y%m%d).sql
 
 # 2) アップロードファイル（volume を tar.gz に固める）
-#    ※ volume 名の先頭「sumakouba-setsubi_」はフォルダ名により変わることがあります。
+#    ※ volume 名の先頭「paloma-pf-setsubi_」はフォルダ名により変わることがあります。
 #      docker volume ls で実際の名前を確認してください。
 docker run --rm \
-  -v sumakouba-setsubi_uploads:/data:ro \
+  -v paloma-pf-setsubi_uploads:/data:ro \
   -v "$PWD":/backup \
   alpine tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /data .
 ```
@@ -168,7 +168,7 @@ cat backup-YYYYMMDD.sql | docker compose exec -T db psql -U setsubi -d setsubi
 
 # 2) アップロードファイルを volume に展開
 docker run --rm \
-  -v sumakouba-setsubi_uploads:/data \
+  -v paloma-pf-setsubi_uploads:/data \
   -v "$PWD":/backup \
   alpine sh -c "cd /data && tar xzf /backup/uploads-YYYYMMDD.tar.gz"
 

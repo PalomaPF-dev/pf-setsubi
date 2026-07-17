@@ -61,7 +61,7 @@ async function sendInviteMail(name: string, email: string, inviteUrl: string): P
         process.env.CONTACT_FROM ||
         process.env.ALERT_MAIL_FROM ||
         process.env.MAIL_FROM ||
-        "PF設備管理 <noreply@sumakouba.com>",
+        "PF設備管理 <noreply@paloma-pf.com>",
       to: [email],
       subject: "【PF設備管理】アカウント発行のご案内",
       text:

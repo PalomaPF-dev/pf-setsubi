@@ -28,7 +28,7 @@ services:
 
   app:
     build: .
-    image: sumakouba-setsubi:latest
+    image: paloma-pf-setsubi:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -56,7 +56,7 @@ services:
       TZ: Asia/Tokyo
 
   cron:
-    image: sumakouba-setsubi:latest
+    image: paloma-pf-setsubi:latest
     restart: unless-stopped
     depends_on:
       - app
