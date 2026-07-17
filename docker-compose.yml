@@ -1,5 +1,5 @@
 # =============================================================================
-# スマコウバ設備 オンプレ版 docker-compose
+# Paloma設備 オンプレ版 docker-compose
 #   db   : PostgreSQL 16（データは named volume db-data に永続化）
 #   app  : Next.js アプリ本体（http://<SERVER_HOST>:8080 で公開）
 #   cron : 点検期限アラートを毎日実行するサイドカー（app と同じイメージ）
@@ -28,7 +28,7 @@ services:
 
   app:
     build: .
-    image: sumakouba-setsubi:latest
+    image: paloma-pf-setsubi:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -56,7 +56,7 @@ services:
       TZ: Asia/Tokyo
 
   cron:
-    image: sumakouba-setsubi:latest
+    image: paloma-pf-setsubi:latest
     restart: unless-stopped
     depends_on:
       - app

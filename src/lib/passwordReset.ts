@@ -43,6 +43,6 @@ export function hashResetToken(token: string): string {
 
 /** リンクの base URL（NEXTAUTH_URL 優先・末尾スラッシュは除去）。 */
 export function resetLinkBase(): string {
-  const base = process.env.NEXTAUTH_URL || "https://sumakouba-setsubi.vercel.app";
+  const base = process.env.NEXTAUTH_URL || "https://setsubi.paloma-pf.com";
   return base.replace(/\/+$/, "");
 }

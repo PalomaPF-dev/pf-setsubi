@@ -126,7 +126,7 @@ export async function POST(req: Request) {
             process.env.CONTACT_FROM ||
             process.env.ALERT_MAIL_FROM ||
             process.env.MAIL_FROM ||
-            "PF設備管理 <noreply@sumakouba.com>",
+            "PF設備管理 <noreply@paloma-pf.com>",
           to: [email],
           subject: "【PF設備管理】アカウント発行のご案内",
           text:
@@ -136,7 +136,7 @@ export async function POST(req: Request) {
             `${inviteUrl}\n\n` +
             `パスワードを設定すると、そのままログインできるようになります。\n` +
             `心当たりがない場合は、このメールを破棄してください。\n\n` +
-            `──\nPF設備管理\n運営：PF運営事務局\n`,
+            `──\nPF設備管理\n`,
         });
       } catch (e) {
         console.warn("[members] invite mail send failed:", (e as Error).message);

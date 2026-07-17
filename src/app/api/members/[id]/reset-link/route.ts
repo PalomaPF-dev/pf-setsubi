@@ -62,7 +62,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
             process.env.CONTACT_FROM ||
             process.env.ALERT_MAIL_FROM ||
             process.env.MAIL_FROM ||
-            "PF設備管理 <noreply@sumakouba.com>",
+            "PF設備管理 <noreply@paloma-pf.com>",
           to: [email],
           subject: "【PF設備管理】パスワード設定リンクのご案内",
           text:
@@ -72,7 +72,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
             `${resetUrl}\n\n` +
             `パスワードを設定すると、そのままログインできるようになります。\n` +
             `心当たりがない場合は、このメールを破棄してください。\n\n` +
-            `──\nPF設備管理\n運営：PF運営事務局\n`,
+            `──\nPF設備管理\n`,
         });
       } catch (e) {
         console.warn("[members] reset-link mail send failed:", (e as Error).message);

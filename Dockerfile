@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# スマコウバ設備 オンプレ版 Dockerfile（3ステージビルド）
+# Paloma設備 オンプレ版 Dockerfile（3ステージビルド）
 #   deps    : 依存パッケージのインストール（package*.json のみで層キャッシュ）
 #   builder : BUILD_STANDALONE=1 で Next.js standalone ビルド
 #   runner  : 実行用の最小イメージ（node ユーザーで実行）

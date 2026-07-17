@@ -77,7 +77,7 @@ export async function POST(req: Request) {
               process.env.CONTACT_FROM ||
               process.env.ALERT_MAIL_FROM ||
               process.env.MAIL_FROM ||
-              "PF設備 <noreply@sumakouba.com>",
+              "PF設備 <noreply@paloma-pf.com>",
             to: [email],
             subject: "【PF設備管理】パスワード再設定のご案内",
             text:
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
               `以下のリンクから${RESET_TOKEN_TTL_MINUTES}分以内に再設定してください。\n\n` +
               `${url}\n\n` +
               `心当たりがない場合は、このメールを破棄してください（パスワードは変更されません）。\n\n` +
-              `──\nPF設備管理\n運営：PF運営事務局\n`,
+              `──\nPF設備管理\n`,
           });
         } catch (e) {
           console.warn("[password-reset] mail send failed:", (e as Error).message);

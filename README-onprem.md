@@ -1,6 +1,6 @@
-# スマコウバ設備 オンプレミス版 セットアップガイド
+# Paloma設備 オンプレミス版 セットアップガイド
 
-社内サーバー（Docker）で「スマコウバ設備」を運用するための手順書です。
+社内サーバー（Docker）で「Paloma設備」を運用するための手順書です。
 クラウド版（Vercel）とコードは共通で、Docker でビルド・起動するだけで
 オンプレ向けの構成（課金なし・ファイルはサーバー内保存・SMTP メール）に切り替わります。
 
@@ -142,10 +142,10 @@ cron コンテナの実行履歴は `docker compose logs -f cron` で確認で�
 docker compose exec db pg_dump -U setsubi setsubi > backup-$(date +%Y%m%d).sql
 
 # 2) アップロードファイル（volume を tar.gz に固める）
-#    ※ volume 名の先頭「sumakouba-setsubi_」はフォルダ名により変わることがあります。
+#    ※ volume 名の先頭「paloma-pf-setsubi_」はフォルダ名により変わることがあります。
 #      docker volume ls で実際の名前を確認してください。
 docker run --rm \
-  -v sumakouba-setsubi_uploads:/data:ro \
+  -v paloma-pf-setsubi_uploads:/data:ro \
   -v "$PWD":/backup \
   alpine tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /data .
 ```
@@ -168,7 +168,7 @@ cat backup-YYYYMMDD.sql | docker compose exec -T db psql -U setsubi -d setsubi
 
 # 2) アップロードファイルを volume に展開
 docker run --rm \
-  -v sumakouba-setsubi_uploads:/data \
+  -v paloma-pf-setsubi_uploads:/data \
   -v "$PWD":/backup \
   alpine sh -c "cd /data && tar xzf /backup/uploads-YYYYMMDD.tar.gz"
 
@@ -241,4 +241,4 @@ setsubi.example.co.jp {
 
 ---
 
-運営: スマコウバ運営事務局
+運営: Paloma
