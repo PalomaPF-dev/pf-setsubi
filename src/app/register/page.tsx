@@ -59,7 +59,7 @@ export default async function RegisterPage() {
         )}
         <div className="mt-6 text-center">
           <a
-            href="https://pf-apps.vercel.app"
+            href="https://portal.paloma-pf.com"
             className="text-sm text-[#707070] transition-colors hover:text-[#f27524]"
           >
             ← ポータルへ戻る
