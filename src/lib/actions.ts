@@ -493,7 +493,7 @@ function approvalMailFrom(): string {
 }
 
 function appOrigin(): string {
-  return (process.env.APP_URL || "https://paloma-pf-setsubi.vercel.app").replace(/\/+$/, "");
+  return (process.env.APP_URL || "https://setsubi.paloma-pf.com").replace(/\/+$/, "");
 }
 
 /**
