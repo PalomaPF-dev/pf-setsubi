@@ -71,7 +71,7 @@ async function sendInviteMail(name: string, email: string, inviteUrl: string): P
         `${inviteUrl}\n\n` +
         `パスワードを設定すると、そのままログインできるようになります。\n` +
         `心当たりがない場合は、このメールを破棄してください。\n\n` +
-        `──\nPF設備管理\n運営：PF運営事務局\n`,
+        `──\nPF設備管理\n`,
     });
   } catch (e) {
     console.warn("[provision] invite mail send failed:", (e as Error).message);
