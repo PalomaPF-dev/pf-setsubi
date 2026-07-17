@@ -13,7 +13,7 @@ set -eu
 # ヒアドキュメントは 'EOF' でクォートしているため $CRON_SECRET はここでは展開されず、
 # cron 実行時にコンテナの環境変数から展開される。
 cat > /etc/crontabs/root <<'EOF'
-# スマコウバ設備: 点検期限アラート（毎日 9:00 JST）
+# Paloma設備: 点検期限アラート（毎日 9:00 JST）
 0 9 * * * wget -qO- --header="Authorization: Bearer $CRON_SECRET" http://app:3000/api/cron/inspection-alert
 EOF
 

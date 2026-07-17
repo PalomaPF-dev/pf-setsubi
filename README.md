@@ -1,6 +1,6 @@
-# スマコウバ設備
+# Paloma設備
 
-製造現場向け **設備管理・点検システム**。スマコウバシリーズ6つ目。
+製造現場向け **設備管理・点検システム**。Palomaシリーズ6つ目。
 
 ## 機能
 
@@ -14,10 +14,10 @@
 
 - Next.js 16（App Router／Server Components＋Server Actions）
 - Neon Postgres（`@neondatabase/serverless`、companyId 単位のマルチテナント）
-- next-auth v4（メール＋パスワード／JWT。クッキー名はアプリ固有 `setsubi.session-token` — localhost で他のスマコウバアプリと衝突しないため）
+- next-auth v4（メール＋パスワード／JWT。クッキー名はアプリ固有 `setsubi.session-token` — localhost で他のPalomaアプリと衝突しないため）
 - Vercel Blob（写真・PDF保管） / Resend（メール） / Vercel Cron（定期実行） / Stripe（サブスク課金）
 - Tailwind CSS v4 / lucide-react / qrcode / html5-qrcode
-- Capacitor で iOS アプリ化（リモート読込方式。スマコウバ計測と同方式）
+- Capacitor で iOS アプリ化（リモート読込方式。Paloma計測と同方式）
 
 ## セットアップ
 
@@ -48,4 +48,4 @@ inspection_items/equipment_procedures/inspection_records/inspection_item_results
 
 ## 運営
 
-スマコウバ運営事務局
+Paloma運営事務局
