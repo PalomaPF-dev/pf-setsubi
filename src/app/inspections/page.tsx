@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FileDown, ClipboardCheck, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserApprovalRouting } from "@/lib/authDb";
 import { getFactoryScope, scopedSiteId } from "@/lib/factoryScope";
 import {
   listRecords,
@@ -72,6 +73,9 @@ export default async function InspectionsPage({
     const scope = await getFactoryScope(session.companyId, session.userId);
     const scopeSiteId = scopedSiteId(scope);
     filters.siteId = scopeSiteId;
+    // 承認ルーティング: 管理者には「自分宛て（指名なし含む）」の承認待ちだけ表示
+    const routing = await getUserApprovalRouting(session.userId);
+    if (routing?.role === "admin") filters.approvalScope = { loginId: routing.loginId };
     [records, equipmentList, procedures] = await Promise.all([
       listRecords(session.companyId, filters),
       listEquipment(session.companyId, undefined, { siteId: scopeSiteId }),

@@ -39,6 +39,8 @@ import {
   returnRecord,
   resubmitRecord,
   listApproverEmails,
+  designatedApproverEmailForUser,
+  canActorApproveRecord,
   getRecordWithResults,
   getApprovalSettings,
   updateApprovalSettings,
@@ -513,12 +515,21 @@ async function notifyApprovalRequested(opts: {
   result: "pass" | "fail";
   ngCount: number;
   inspectorEmail?: string;
+  /** 提出者のユーザーID（指名承認者へのメールルーティング用） */
+  inspectorUserId?: string | null;
 }): Promise<void> {
   if (opts.isDemo) return;
   const mailer = getMailer();
   if (!mailer) return;
   try {
-    const to = await listApproverEmails(opts.companyId);
+    // 提出者に指名承認者（approver_login_id）がいてメールを持っていればその人だけに送り、
+    // いなければ従来どおり（会社設定の承認者メール → 全ユーザー）にフォールバック。
+    let to: string[] = [];
+    if (opts.inspectorUserId) {
+      const designated = await designatedApproverEmailForUser(opts.inspectorUserId);
+      if (designated) to = [designated];
+    }
+    if (to.length === 0) to = await listApproverEmails(opts.companyId);
     if (to.length === 0) return;
     const resultLabel = opts.result === "fail" ? `不合格（NG ${opts.ngCount}件）` : "合格";
     const eq = opts.managementNo ? `${opts.equipmentName}（${opts.managementNo}）` : opts.equipmentName;
@@ -742,6 +753,7 @@ export async function completeInspectionAction(
     result: ngCount > 0 ? "fail" : "pass",
     ngCount,
     inspectorEmail: email,
+    inspectorUserId: userId,
   });
 
   revalidatePath("/");
@@ -781,6 +793,10 @@ export async function approveInspectionAction(recordId: string): Promise<{ error
   const { companyId, userId, userName } = await requireEntitledSession();
   const rec = await getRecordWithResults(companyId, recordId);
   if (!rec) return { error: "点検記録が見つかりません" };
+  // 承認ルーティング: 管理者は「提出者の指名承認者が未設定 or 自分」の記録のみ承認可能
+  if (!(await canActorApproveRecord(companyId, recordId, userId))) {
+    return { error: "この点検の承認は、提出者が指名した承認者のみ行えます" };
+  }
   await approveRecord(companyId, recordId, userId, userName || "（承認者）");
   revalidateAfterApproval(recordId, rec.record.equipmentId);
   return {};
@@ -796,6 +812,10 @@ export async function returnInspectionAction(
   if (!comment) return { error: "差し戻しの理由を入力してください" };
   const rec = await getRecordWithResults(companyId, recordId);
   if (!rec) return { error: "点検記録が見つかりません" };
+  // 承認ルーティング: 管理者は「提出者の指名承認者が未設定 or 自分」の記録のみ差し戻し可能
+  if (!(await canActorApproveRecord(companyId, recordId, userId))) {
+    return { error: "この点検の差し戻しは、提出者が指名した承認者のみ行えます" };
+  }
   await returnRecord(companyId, recordId, userId, userName || "（承認者）", comment);
   revalidateAfterApproval(recordId, rec.record.equipmentId);
   return {};

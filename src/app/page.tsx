@@ -12,6 +12,7 @@ import {
   Circle,
 } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserApprovalRouting } from "@/lib/authDb";
 import { getFactoryScope, scopedSiteId } from "@/lib/factoryScope";
 import {
   dashboardCounts,
@@ -55,10 +56,13 @@ export default async function DashboardPage({
     // 所属工場による表示制限（制限ユーザーは工場を自工場に強制）
     const scope = await getFactoryScope(session.companyId, session.userId);
     siteId = scopedSiteId(scope, asUuid(sp.site));
+    // 承認ルーティング: 管理者には「自分宛て（指名なし含む）」の承認待ちだけ数える/見せる
+    const routing = await getUserApprovalRouting(session.userId);
+    const approvalScope = routing?.role === "admin" ? { loginId: routing.loginId } : null;
     [counts, dueList, records, actionList, sites] = await Promise.all([
-      dashboardCounts(session.companyId, today, SOON_DAYS, { siteId, areaId }),
+      dashboardCounts(session.companyId, today, SOON_DAYS, { siteId, areaId }, approvalScope),
       listAssignmentsDue(session.companyId, { siteId, areaId }),
-      listRecords(session.companyId, { limit: 8, siteId, areaId }),
+      listRecords(session.companyId, { limit: 8, siteId, areaId, approvalScope }),
       // 処置カードは全社表示（工場/職場フィルタ非対応）。ただし制限ユーザーは自工場のみ
       listCorrectiveActions(session.companyId, {
         limit: 30,

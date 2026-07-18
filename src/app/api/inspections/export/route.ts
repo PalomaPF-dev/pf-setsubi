@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { getCompanyEntitlement } from "@/lib/entitlement";
+import { getUserApprovalRouting } from "@/lib/authDb";
 import { getFactoryScope, scopedSiteId } from "@/lib/factoryScope";
 import {
   listRecords,
@@ -63,6 +64,9 @@ export async function GET(req: Request) {
     // 所属工場による表示制限（制限ユーザーは工場を自工場に強制）
     const scope = await getFactoryScope(session.user.companyId, session.user.id);
     filters.siteId = scopedSiteId(scope, filters.siteId);
+    // 承認ルーティング: 一覧と同様、管理者は自分宛て（指名なし含む）の承認待ちのみ出力
+    const routing = await getUserApprovalRouting(session.user.id);
+    if (routing?.role === "admin") filters.approvalScope = { loginId: routing.loginId };
     const records = await listRecords(session.user.companyId, filters);
     const recordIds = records.map((r) => r.id);
     const [resultsByRecord, mediaByItemResult] = await Promise.all([
