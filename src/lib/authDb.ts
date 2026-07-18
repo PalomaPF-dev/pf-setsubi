@@ -29,6 +29,9 @@ export async function ensureAuthSchema(): Promise<void> {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_id TEXT`;
   // 所属工場（sites.name と名称一致で照合）。NULL = 全工場閲覧可（本部スタッフ等）。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS factory TEXT`;
+  // 指名承認者（承認者の login_id）。NULL = 指名なし（全管理者が承認可能）。
+  // ポータル provision v2 が設定する。点検承認のルーティングとメール宛先に使う。
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS approver_login_id TEXT`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_login_id_idx ON users(login_id)`;
   await sql`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`;
   // バックフィル①: 統一管理者ID 'admin'。未使用のときだけ最古の管理者1名に付与
@@ -161,14 +164,15 @@ export async function createInvitedUser(
   email: string | null,
   name: string,
   role: "admin" | "member",
-  factory: string | null = null
+  factory: string | null = null,
+  approverLoginId: string | null = null
 ): Promise<string> {
   const sql = getSql();
   // ランダムな使えないパスワード（招待完了までログイン不可）
   const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 12);
   const rows = await sql`
-    INSERT INTO users (company_id, login_id, email, name, password_hash, role, pending, factory)
-    VALUES (${companyId}, ${loginId}, ${email}, ${name}, ${passwordHash}, ${role}, true, ${factory})
+    INSERT INTO users (company_id, login_id, email, name, password_hash, role, pending, factory, approver_login_id)
+    VALUES (${companyId}, ${loginId}, ${email}, ${name}, ${passwordHash}, ${role}, true, ${factory}, ${approverLoginId})
     RETURNING id
   `;
   return rows[0].id as string;
@@ -226,6 +230,23 @@ export async function getUserRoleAndFactory(
   return {
     role: rows[0].role as "admin" | "member",
     factory: (rows[0].factory as string | null) ?? null,
+  };
+}
+
+/**
+ * 点検承認ルーティング用: ユーザーの role と login_id を取得（存在しなければ null）。
+ * 管理者が承認待ち一覧・承認操作を行うとき、自分宛て（提出者の approver_login_id が
+ * NULL または自分の login_id）の記録だけを対象にするために使う。
+ */
+export async function getUserApprovalRouting(
+  userId: string
+): Promise<{ role: "admin" | "member"; loginId: string | null } | null> {
+  const sql = getSql();
+  const rows = await sql`SELECT role, login_id FROM users WHERE id = ${userId} LIMIT 1`;
+  if (rows.length === 0) return null;
+  return {
+    role: rows[0].role as "admin" | "member",
+    loginId: (rows[0].login_id as string | null) ?? null,
   };
 }
 

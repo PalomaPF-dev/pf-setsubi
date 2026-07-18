@@ -1033,6 +1033,17 @@ export async function findRecordIdByClientKey(
   return rows[0] ? (rows[0].id as string) : null;
 }
 
+/**
+ * 承認ルーティングの閲覧スコープ（管理者向け）。
+ * 設定すると、承認待ち（pending）の記録は「提出者の指名承認者が未設定
+ * （approver_login_id IS NULL）または自分の login_id と一致」するものだけに絞られる。
+ * 提出者が特定できない記録（inspector_user_id なし・ユーザー削除済み）は指名なし扱いで表示する。
+ * pending 以外の記録には影響しない。非管理者にはこのスコープを渡さない（従来どおり全件）。
+ */
+export interface ApprovalScope {
+  loginId: string | null;
+}
+
 export interface RecordFilters {
   equipmentId?: string;
   procedureId?: string;
@@ -1043,6 +1054,8 @@ export interface RecordFilters {
   limit?: number;
   siteId?: string;
   areaId?: string;
+  /** 管理者の承認ルーティングスコープ（pending 記録の絞り込み）。 */
+  approvalScope?: ApprovalScope | null;
 }
 
 /** 点検記録の横断一覧（設備名付き・フィルタ対応）。 */
@@ -1054,6 +1067,10 @@ export async function listRecords(
   const sql = getSql();
   // 既定は一覧表示向けの 200。CSVエクスポートは明示的に大きな値を渡す（上限 10000）。
   const limit = Math.min(filters.limit ?? 200, 10000);
+  // 承認ルーティング: スコープ指定時、pending 記録は「提出者の指名承認者が
+  // 未設定 or 自分」のものだけ（提出者不明は指名なし扱い = 表示）。
+  const scopeActive = filters.approvalScope != null;
+  const scopeLoginId = filters.approvalScope?.loginId ?? null;
   const rows = await sql`
     SELECT r.*, e.name AS equipment_name, e.management_no
     FROM inspection_records r
@@ -1067,6 +1084,13 @@ export async function listRecords(
       AND (${filters.to ?? null}::date IS NULL OR r.inspection_date <= ${filters.to ?? null}::date)
       AND (${filters.siteId ?? null}::uuid IS NULL OR e.site_id = ${filters.siteId ?? null}::uuid)
       AND (${filters.areaId ?? null}::uuid IS NULL OR e.area_id = ${filters.areaId ?? null}::uuid)
+      AND (${scopeActive}::boolean = false
+           OR r.approval_status <> 'pending'
+           OR NOT EXISTS (
+                SELECT 1 FROM users su
+                WHERE su.id = r.inspector_user_id
+                  AND su.approver_login_id IS NOT NULL
+                  AND su.approver_login_id IS DISTINCT FROM ${scopeLoginId}::text))
     ORDER BY r.inspection_date DESC, r.created_at DESC
     LIMIT ${limit}`;
   return rows.map(mapRecord);
@@ -1241,6 +1265,90 @@ export async function listApproverEmails(companyId: string): Promise<string[]> {
   // email は任意項目（NULL 可）なので未登録ユーザーは宛先から除外
   const users = await sql`SELECT email FROM users WHERE company_id = ${companyId}`;
   return users.map((u: any) => (u.email as string | null) ?? "").filter(Boolean);
+}
+
+/**
+ * 提出者の指名承認者（users.approver_login_id → その login_id を持つユーザー）の
+ * メールアドレスを返す。指名なし・承認者未登録・メール未設定なら null
+ * （呼び出し側は listApproverEmails にフォールバックする）。
+ */
+export async function designatedApproverEmailForUser(
+  submitterUserId: string
+): Promise<string | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT a.email
+    FROM users s
+    JOIN users a ON a.login_id = s.approver_login_id
+    WHERE s.id = ${submitterUserId} AND s.approver_login_id IS NOT NULL
+    LIMIT 1`;
+  const email = (rows[0]?.email as string | null) ?? null;
+  return email && email.trim() ? email.trim() : null;
+}
+
+/**
+ * 承認/差し戻し操作の認可（承認ルーティング）。
+ * - 非管理者: 従来どおり許可（挙動変更なし）。
+ * - 管理者: 提出者（inspector_user_id）の指名承認者が未設定（NULL）か、
+ *   自分の login_id と一致する場合のみ許可。提出者が特定できない記録は指名なし扱いで許可。
+ */
+export async function canActorApproveRecord(
+  companyId: string,
+  recordId: string,
+  actorUserId: string
+): Promise<boolean> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT a.role AS actor_role, a.login_id AS actor_login_id,
+           su.approver_login_id AS submitter_approver
+    FROM users a
+    LEFT JOIN inspection_records r
+      ON r.id = ${recordId} AND r.company_id = ${companyId}
+    LEFT JOIN users su ON su.id = r.inspector_user_id
+    WHERE a.id = ${actorUserId}
+    LIMIT 1`;
+  if (!rows[0]) return false;
+  const r: any = rows[0];
+  if ((r.actor_role as string) !== "admin") return true;
+  const approver = (r.submitter_approver as string | null) ?? null;
+  if (approver == null) return true;
+  return approver === ((r.actor_login_id as string | null) ?? null);
+}
+
+/**
+ * ポータル連携: 実会社（is_demo=false）の承認待ち点検記録の総数。
+ * /api/approvals/summary が使う。
+ */
+export async function pendingRecordCountAllRealCompanies(): Promise<number> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT COUNT(*)::int AS n
+    FROM inspection_records r
+    JOIN companies c ON c.id = r.company_id
+    WHERE r.approval_status = 'pending' AND c.is_demo = false`;
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * ポータル連携: 実会社（is_demo=false）の承認待ち記録を一括で差し戻し（pending → returned）。
+ * 差し戻し件数を返す。/api/approvals/reset が使う（UI は既存の returned 表示・再提出で扱える）。
+ */
+export async function resetPendingRecordsAllRealCompanies(): Promise<number> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE inspection_records r SET
+      approval_status = 'returned',
+      approved_at = NULL,
+      updated_at = NOW()
+    FROM companies c
+    WHERE c.id = r.company_id AND c.is_demo = false
+      AND r.approval_status = 'pending'
+    RETURNING r.id`;
+  return rows.length;
 }
 
 // ===== 数値推移 =====
@@ -1444,7 +1552,8 @@ export async function dashboardCounts(
   companyId: string,
   today: string,
   soonDays: number,
-  filters: SiteFilters = {}
+  filters: SiteFilters = {},
+  approvalScope: ApprovalScope | null = null
 ): Promise<{
   total: number;
   overdue: number;
@@ -1503,12 +1612,21 @@ export async function dashboardCounts(
     WHERE ca.company_id = ${companyId}
       AND (${siteId}::uuid IS NULL OR e.site_id = ${siteId}::uuid)
       AND (${areaId}::uuid IS NULL OR e.area_id = ${areaId}::uuid)`;
+  // 承認ルーティング: 管理者にはスコープを渡し、自分宛て（指名なし含む）の承認待ちだけ数える
+  const scopeActive = approvalScope != null;
+  const scopeLoginId = approvalScope?.loginId ?? null;
   const approvalRows = await sql`
     SELECT COUNT(*) AS c FROM inspection_records r
     JOIN equipment e ON e.id = r.equipment_id
     WHERE r.company_id = ${companyId} AND r.approval_status = 'pending'
       AND (${siteId}::uuid IS NULL OR e.site_id = ${siteId}::uuid)
-      AND (${areaId}::uuid IS NULL OR e.area_id = ${areaId}::uuid)`;
+      AND (${areaId}::uuid IS NULL OR e.area_id = ${areaId}::uuid)
+      AND (${scopeActive}::boolean = false
+           OR NOT EXISTS (
+                SELECT 1 FROM users su
+                WHERE su.id = r.inspector_user_id
+                  AND su.approver_login_id IS NOT NULL
+                  AND su.approver_login_id IS DISTINCT FROM ${scopeLoginId}::text))`;
   const e: any = eqRows[0];
   const d: any = dueRows[0];
   const a: any = actionRows[0];

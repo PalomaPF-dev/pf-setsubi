@@ -131,6 +131,18 @@ export async function POST(req: Request) {
         const name = (u?.name ?? "").toString().trim();
         const email = ((u?.email ?? "").toString().trim().toLowerCase() as string) || null;
         const role: "admin" | "member" = u?.role === "admin" ? "admin" : "member";
+        // 指名承認者（承認者の login_id）。null/空文字は「指名なし」。
+        const approverLoginId: string | null =
+          ((u?.approverLoginId ?? "").toString().trim() as string) || null;
+        if (approverLoginId && !isLoginId(approverLoginId)) {
+          results.push({
+            loginId,
+            status: "error",
+            message:
+              "承認者の社員番号は半角英数字とハイフン・アンダースコア（1〜64文字）で入力してください。",
+          });
+          continue;
+        }
         if (email && (!isEmail(email) || email.length > 254)) {
           results.push({
             loginId,
@@ -154,10 +166,18 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // 既存ユーザー（login_id 一致）: factory が渡されたら更新し、
-        // regenerateLinks のときだけ設定リンクを再発行
+        // 既存ユーザー（login_id 一致）: provision v2 では name / role / approver_login_id
+        // （email は指定があるときのみ）を最新の内容に更新し、factory は渡されたときだけ更新。
+        // regenerateLinks のときだけ設定リンクを再発行。ステータスは従来どおり "exists"。
         const existing = await sql`SELECT id FROM users WHERE login_id = ${loginId} LIMIT 1`;
         if (existing.length > 0) {
+          await sql`
+            UPDATE users SET
+              name = CASE WHEN ${name} <> '' THEN ${name} ELSE name END,
+              role = ${role},
+              approver_login_id = ${approverLoginId},
+              email = COALESCE(${email}, email)
+            WHERE id = ${existing[0].id}`;
           if (factoryProvided) {
             await sql`UPDATE users SET factory = ${factory} WHERE id = ${existing[0].id}`;
           }
@@ -185,7 +205,15 @@ export async function POST(req: Request) {
         }
 
         // 新規発行: 招待ユーザー作成 → 設定リンク発行 →（メールがあれば）送信
-        const userId = await createInvitedUser(companyId, loginId, email, name, role, factory);
+        const userId = await createInvitedUser(
+          companyId,
+          loginId,
+          email,
+          name,
+          role,
+          factory,
+          approverLoginId
+        );
         const token = generateResetToken();
         await sql`
           INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
