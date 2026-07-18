@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { CheckCircle2 } from "lucide-react";
+import ContactAdminModal from "@/components/ContactAdminModal";
 
 // useSearchParams はプリレンダー時に Suspense 境界が必要
 export default function LoginPage() {
@@ -178,12 +179,7 @@ function LoginInner() {
             </Link>
             <p className="mt-1 text-xs text-[#707070]">
               メール未登録の方は
-              <a
-                href="mailto:info@paloma-pf.com"
-                className="text-[#707070] underline decoration-dotted underline-offset-2 transition-colors hover:text-[#f27524] hover:decoration-solid"
-              >
-                管理者にお問い合わせください
-              </a>
+              <ContactAdminModal />
             </p>
           </div>
         </div>
