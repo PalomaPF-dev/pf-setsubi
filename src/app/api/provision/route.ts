@@ -44,6 +44,7 @@ function safeKeyEqual(a: string, b: string): boolean {
 type ProvisionResult = {
   loginId: string;
   status: "created" | "exists" | "error";
+  passwordSet?: boolean;
   inviteUrl?: string;
   message?: string;
 };
@@ -169,7 +170,7 @@ export async function POST(req: Request) {
         // 既存ユーザー（login_id 一致）: provision v2 では name / role / approver_login_id
         // （email は指定があるときのみ）を最新の内容に更新し、factory は渡されたときだけ更新。
         // regenerateLinks のときだけ設定リンクを再発行。ステータスは従来どおり "exists"。
-        const existing = await sql`SELECT id FROM users WHERE login_id = ${loginId} LIMIT 1`;
+        const existing = await sql`SELECT id, pending FROM users WHERE login_id = ${loginId} LIMIT 1`;
         if (existing.length > 0) {
           await sql`
             UPDATE users SET
@@ -182,7 +183,7 @@ export async function POST(req: Request) {
             await sql`UPDATE users SET factory = ${factory} WHERE id = ${existing[0].id}`;
           }
           if (!regenerateLinks) {
-            results.push({ loginId, status: "exists" });
+            results.push({ loginId, status: "exists", passwordSet: !existing[0].pending });
             continue;
           }
           const userId = existing[0].id as string;
@@ -194,6 +195,7 @@ export async function POST(req: Request) {
           results.push({
             loginId,
             status: "exists",
+            passwordSet: !existing[0].pending,
             inviteUrl: `${resetLinkBase()}/password-reset/confirm?token=${token}`,
           });
           continue;
@@ -221,7 +223,7 @@ export async function POST(req: Request) {
                   NOW() + make_interval(mins => ${INVITE_TOKEN_TTL_MINUTES}))`;
         const inviteUrl = `${resetLinkBase()}/password-reset/confirm?token=${token}`;
         if (email) await sendInviteMail(name, email, inviteUrl);
-        results.push({ loginId, status: "created", inviteUrl });
+        results.push({ loginId, status: "created", passwordSet: false, inviteUrl });
       } catch (e) {
         // email 一意制約違反などもここに落として続行
         results.push({ loginId, status: "error", message: (e as Error).message });
