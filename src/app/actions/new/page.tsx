@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Wrench } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getFactoryScope, isEquipmentSiteVisible, scopedSiteId } from "@/lib/factoryScope";
-import { getEquipment, getItemResultContext, listEquipment } from "@/lib/db";
+import { getEquipment, getItemResultContext, listEquipment, listWorkers } from "@/lib/db";
 import { createCorrectiveActionAction } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import SubmitButton from "@/components/SubmitButton";
 import DbErrorState from "@/components/DbErrorState";
+import WorkerSelectField from "@/components/WorkerSelectField";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +35,11 @@ export default async function NewActionPage({
   let ctx = null;
   let equipment;
   let outOfScope = false;
+  let workerNames: string[] = [];
   try {
     // 所属工場による表示制限（制限ユーザーは自工場の設備のみ起票対象）
     const scope = await getFactoryScope(session.companyId, session.userId);
+    workerNames = (await listWorkers(session.companyId)).map((w) => w.name);
     if (itemResultId) {
       ctx = await getItemResultContext(session.companyId, itemResultId);
       if (ctx && scope.restricted) {
@@ -131,7 +134,12 @@ export default async function NewActionPage({
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">担当者</span>
-            <input name="assignee" placeholder="例: 保全 山田" className={inputCls} />
+            <WorkerSelectField
+              name="assignee"
+              workers={workerNames}
+              placeholder="例: 保全 山田"
+              className={inputCls}
+            />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">対応期限</span>
