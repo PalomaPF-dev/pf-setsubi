@@ -139,7 +139,7 @@ function LoginInner() {
             <button
               type="submit"
               disabled={loading || demoLoading}
-              className="w-full rounded-lg bg-[#f27524] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#c6601e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full rounded-lg bg-[#f27524] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#c95e1a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "ログイン中…" : "ログイン"}
             </button>
@@ -165,19 +165,25 @@ function LoginInner() {
             )}
           </button>
 
-          <div className="mt-3 text-center text-sm">
-            {/* ポータルの管理者発行アカウント（社員番号のみ・メール無し）の初回パスワード設定 */}
-            <Link
-              href="/first-login"
-              className="block font-semibold text-[#f27524] hover:underline"
-            >
+          {/* ポータルで発行された社員番号アカウント（pending）の初回パスワード設定 */}
+          <div className="mt-4 rounded-lg border border-[#f27524]/40 bg-[#fef3ec] px-3 py-2.5 text-center text-sm">
+            <Link href="/first-login" className="font-semibold text-[#f27524] hover:underline">
               初めてログインする方はこちら（パスワード設定）
             </Link>
-            <Link href="/password-reset" className="mt-1 inline-block text-[#f27524] hover:underline">
+          </div>
+
+          <div className="mt-3 text-center text-sm">
+            <Link href="/password-reset" className="text-[#f27524] hover:underline">
               パスワードをお忘れの方はこちら
             </Link>
             <p className="mt-1 text-xs text-[#707070]">
-              メール未登録の方は管理者にお問い合わせください
+              メール未登録の方は
+              <a
+                href="mailto:info@paloma-pf.com"
+                className="text-[#707070] underline decoration-dotted underline-offset-2 transition-colors hover:text-[#f27524] hover:decoration-solid"
+              >
+                管理者にお問い合わせください
+              </a>
             </p>
           </div>
         </div>
