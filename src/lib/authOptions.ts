@@ -72,7 +72,9 @@ export const authOptions: NextAuthOptions = {
         if (!user) return null;
         // 招待中（パスワード未設定）はログイン不可。メッセージは signIn の res.error に載る。
         if (user.pending) {
-          throw new Error("パスワードが未設定です。管理者にリンクの再発行を依頼してください");
+          throw new Error(
+            "初回ログインのため、パスワードの設定が必要です。ログイン画面の「初めてログインする方はこちら」からパスワードを設定してください。"
+          );
         }
         const valid = await bcrypt.compare(credentials.password, user.password_hash as string);
         if (!valid) return null;
