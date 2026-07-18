@@ -30,7 +30,7 @@ import CustomFieldDefForm from "@/components/CustomFieldDefForm";
 import FactoryMapUploadForm from "@/components/FactoryMapUploadForm";
 import DbErrorState from "@/components/DbErrorState";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
-import MemberManagement from "@/components/MemberManagement";
+import WorkerManagement from "@/components/WorkerManagement";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500";
@@ -60,10 +60,6 @@ export default async function SettingsPage() {
   }
 
   const preview = `${s.prefix}-${String(s.seq).padStart(s.digits, "0")}`;
-  // 管理者のみメンバー管理を表示（デモでは非表示）
-  const isAdmin = rf?.role === "admin" && !isDemo;
-  // メンバー発行フォームの「所属工場」の選択肢（工場マスタの名称）
-  const factoryNames = sites.map((site) => site.name);
   // 所属工場による表示制限ユーザーには、工場・職場の一覧も自工場のみ見せる
   const restrictedFactory = rf && rf.role !== "admin" ? rf.factory : null;
   if (restrictedFactory) {
@@ -78,8 +74,8 @@ export default async function SettingsPage() {
       />
 
       <div className="flex flex-col gap-6">
-        {/* メンバー（アカウント管理）＝管理者限定 */}
-        {isAdmin && <MemberManagement myUserId={userId} factoryNames={factoryNames} />}
+        {/* 作業者管理（アカウント管理はポータル。ログイン中なら誰でも操作可） */}
+        <WorkerManagement />
 
         {/* 採番ルール */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -156,7 +152,7 @@ export default async function SettingsPage() {
           </h2>
           <p className="mb-4 text-xs text-slate-400">
             点検が実施されると「承認待ち」になり、承認者へメールで結果が届きます。承認すると点検完了、差し戻すと
-            再点検対象に戻ります。作業者名簿を登録すると、点検開始時に作業者を選べます。
+            再点検対象に戻ります。
           </p>
 
           <form action={updateApprovalSettingsAction} className="flex flex-col gap-4">
@@ -171,20 +167,6 @@ export default async function SettingsPage() {
               />
               <p className="mt-1 text-xs text-slate-400">
                 点検完了時に承認依頼メールを送る宛先。空欄の場合は社内の全ユーザーに送信します。
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">作業者名簿</label>
-              <textarea
-                name="workerRoster"
-                rows={4}
-                defaultValue={(approval.workerRoster ?? []).join("\n")}
-                placeholder={"山田 太郎\n佐藤 花子\n（1行に1名）"}
-                className={inputCls}
-              />
-              <p className="mt-1 text-xs text-slate-400">
-                1行に1名。点検開始時にこの一覧から作業者を選べます（その場で手入力も可能）。
               </p>
             </div>
 

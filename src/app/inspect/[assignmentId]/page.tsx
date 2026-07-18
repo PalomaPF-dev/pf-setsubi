@@ -7,9 +7,9 @@ import {
   getAssignment,
   getEquipment,
   getProcedure,
-  getApprovalSettings,
   listInspectionItems,
   listReferenceMediaForProcedure,
+  listWorkers,
 } from "@/lib/db";
 import type {
   Equipment,
@@ -46,14 +46,14 @@ export default async function InspectPage({
     assignment = await getAssignment(session.companyId, assignmentId);
     if (assignment) {
       let refMap: Map<string, ItemReferenceMedia[]>;
-      let approval;
+      let workers;
       let scope;
-      [equipment, procedure, items, refMap, approval, scope] = await Promise.all([
+      [equipment, procedure, items, refMap, workers, scope] = await Promise.all([
         getEquipment(session.companyId, assignment.equipmentId),
         getProcedure(session.companyId, assignment.procedureId),
         listInspectionItems(session.companyId, assignment.procedureId),
         listReferenceMediaForProcedure(session.companyId, assignment.procedureId),
-        getApprovalSettings(session.companyId),
+        listWorkers(session.companyId),
         getFactoryScope(session.companyId, session.userId),
       ]);
       // 所属工場による表示制限（他工場の設備の点検は開始できない＝notFound）
@@ -61,7 +61,7 @@ export default async function InspectPage({
         assignment = null;
       }
       referenceMedia = Object.fromEntries(refMap);
-      workerRoster = approval.workerRoster;
+      workerRoster = workers.map((w) => w.name);
     }
   } catch (e) {
     console.error("[inspect]", e);

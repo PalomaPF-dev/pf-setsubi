@@ -72,12 +72,19 @@ async function seedSampleData(
 ): Promise<void> {
   const today = todayJST();
 
-  // 承認ワークフローのデモ設定（承認者メール・作業者名簿）。デモ会社はメール送信対象外。
+  // 承認ワークフローのデモ設定（承認者メール）。デモ会社はメール送信対象外。
   await sql`
     UPDATE companies SET
-      approver_email = ${"kanri@example.com"},
-      worker_roster = ${JSON.stringify(["山田 太郎", "佐藤 花子", "鈴木 一郎"])}::jsonb
+      approver_email = ${"kanri@example.com"}
     WHERE id = ${companyId}`;
+
+  // 作業者名簿（記録入力時に選択する名前。アカウントとは独立）
+  await sql`
+    INSERT INTO workers (company_id, name) VALUES
+      (${companyId}, ${"山田 太郎"}),
+      (${companyId}, ${"佐藤 花子"}),
+      (${companyId}, ${"鈴木 一郎"})
+    ON CONFLICT (company_id, name) DO NOTHING`;
 
   // カスタム項目定義
   const cfRows = await sql`

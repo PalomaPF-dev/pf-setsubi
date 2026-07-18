@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, Wrench, CircleDashed, CheckCircle2, AlertTriangle } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getFactoryScope, scopedSiteId } from "@/lib/factoryScope";
-import { listCorrectiveActions, listEquipment } from "@/lib/db";
+import { listCorrectiveActions, listEquipment, listWorkers } from "@/lib/db";
 import {
   updateCorrectiveActionAction,
   completeCorrectiveActionAction,
@@ -16,6 +16,7 @@ import { ActionStatusBadge, DueBadge } from "@/components/Badges";
 import SubmitButton from "@/components/SubmitButton";
 import ConfirmForm from "@/components/ConfirmForm";
 import DbErrorState from "@/components/DbErrorState";
+import WorkerSelectField from "@/components/WorkerSelectField";
 import type { CorrectiveAction, ActionStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export default async function ActionsPage({
       : undefined;
 
   let open: CorrectiveAction[], inProgress: CorrectiveAction[], done: CorrectiveAction[], equipment;
+  let workerNames: string[] = [];
   try {
     // 所属工場による表示制限（制限ユーザーは自工場の処置・設備のみ）
     const scope = await getFactoryScope(session.companyId, session.userId);
@@ -58,6 +60,7 @@ export default async function ActionsPage({
       }),
       listEquipment(session.companyId, undefined, { siteId }),
     ]);
+    workerNames = (await listWorkers(session.companyId)).map((w) => w.name);
   } catch (e) {
     console.error("[actions]", e);
     return (
@@ -159,7 +162,7 @@ export default async function ActionsPage({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {open.map((a) => (
-                  <ActionRow key={a.id} action={a} today={today} />
+                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} />
                 ))}
               </ul>
             )}
@@ -177,7 +180,7 @@ export default async function ActionsPage({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {inProgress.map((a) => (
-                  <ActionRow key={a.id} action={a} today={today} />
+                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} />
                 ))}
               </ul>
             )}
@@ -205,7 +208,7 @@ export default async function ActionsPage({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {done.map((a) => (
-                  <ActionRow key={a.id} action={a} today={today} />
+                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} />
                 ))}
               </ul>
             )}
@@ -253,7 +256,15 @@ function Empty({ text }: { text: string }) {
 }
 
 /** 処置1件の行。未完了は一覧内インラインで編集・完了できる（既存の割当編集と同型）。 */
-function ActionRow({ action: a, today }: { action: CorrectiveAction; today: string }) {
+function ActionRow({
+  action: a,
+  today,
+  workerNames,
+}: {
+  action: CorrectiveAction;
+  today: string;
+  workerNames: string[];
+}) {
   const lv = dueLevel(a.dueDate, today);
   const isDone = a.status === "done";
   return (
@@ -306,7 +317,12 @@ function ActionRow({ action: a, today }: { action: CorrectiveAction; today: stri
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-slate-500">担当者</span>
-                  <input name="assignee" defaultValue={a.assignee ?? ""} className={inputCls} />
+                  <WorkerSelectField
+                    name="assignee"
+                    workers={workerNames}
+                    defaultValue={a.assignee ?? ""}
+                    className={inputCls}
+                  />
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-slate-500">対応期限</span>

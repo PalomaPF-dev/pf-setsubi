@@ -1319,7 +1319,9 @@ function WorkerSelectScreen({
   onChange: (v: string) => void;
   onStart: () => void;
 }) {
-  const canStart = value.trim().length > 0;
+  // 作業者名簿があれば選択式。名簿に無い値（共有アカウント名など）は未選択として扱う。
+  const selectValue = roster.includes(value.trim()) ? value.trim() : "";
+  const canStart = roster.length > 0 ? selectValue.length > 0 : value.trim().length > 0;
   return (
     <div className="mx-auto max-w-md p-4 sm:p-6">
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1334,43 +1336,37 @@ function WorkerSelectScreen({
           <span className="text-xs">{procedureName}</span>
         </p>
 
-        {roster.length > 0 && (
+        {roster.length > 0 ? (
           <div className="mt-5">
-            <div className="mb-1.5 text-xs font-medium text-slate-500">名簿から選ぶ</div>
-            <div className="flex flex-wrap gap-2">
-              {roster.map((name) => {
-                const active = value.trim() === name;
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => onChange(name)}
-                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                      active
-                        ? "border-orange-500 bg-orange-700 text-white"
-                        : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">作業者</label>
+            <select
+              value={selectValue}
+              onChange={(e) => onChange(e.target.value)}
+              className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            >
+              <option value="">選択してください</option>
+              {roster.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-slate-400">
+              作業者は設定ページの「作業者管理」で登録できます。
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5">
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">作業者名</label>
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="例: 山田 太郎"
+              className="h-12 w-full rounded-xl border border-slate-300 px-3 text-base focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            />
           </div>
         )}
-
-        <div className="mt-5">
-          <label className="mb-1.5 block text-xs font-medium text-slate-500">
-            {roster.length > 0 ? "または直接入力" : "作業者名"}
-          </label>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="例: 山田 太郎"
-            className="h-12 w-full rounded-xl border border-slate-300 px-3 text-base focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-          />
-        </div>
 
         <button
           type="button"

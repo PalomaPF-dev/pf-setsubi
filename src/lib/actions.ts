@@ -842,20 +842,12 @@ export async function updateManagementNoSettingsAction(fd: FormData): Promise<vo
   revalidatePath("/settings");
 }
 
-// ===== 承認ワークフロー設定（承認者メール・作業者名簿） =====
+// ===== 承認ワークフロー設定（承認者メール） =====
 
 export async function updateApprovalSettingsAction(fd: FormData): Promise<void> {
   const { companyId } = await requireEntitledSession();
   const approverEmail = strOrNull(fd, "approverEmail");
-  const workerRoster = [
-    ...new Set(
-      str(fd, "workerRoster")
-        .split(/[\n,、]+/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-    ),
-  ].slice(0, 100);
-  await updateApprovalSettings(companyId, { approverEmail, workerRoster });
+  await updateApprovalSettings(companyId, { approverEmail });
   revalidatePath("/settings");
 }
 
