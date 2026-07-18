@@ -166,7 +166,14 @@ function LoginInner() {
           </button>
 
           <div className="mt-3 text-center text-sm">
-            <Link href="/password-reset" className="text-[#f27524] hover:underline">
+            {/* ポータルの管理者発行アカウント（社員番号のみ・メール無し）の初回パスワード設定 */}
+            <Link
+              href="/first-login"
+              className="block font-semibold text-[#f27524] hover:underline"
+            >
+              初めてログインする方はこちら（パスワード設定）
+            </Link>
+            <Link href="/password-reset" className="mt-1 inline-block text-[#f27524] hover:underline">
               パスワードをお忘れの方はこちら
             </Link>
             <p className="mt-1 text-xs text-[#707070]">
