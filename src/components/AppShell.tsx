@@ -105,7 +105,7 @@ function UserFooter() {
         {session.user.name}
       </div>
       <button
-        onClick={() => signOut({ callbackUrl: "/login" })}
+        onClick={() => { void signOut({ redirect: false }).then(() => { window.location.href = "https://portal.paloma-pf.com/"; }); }}
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-medium text-[#555555] hover:bg-[#f7f7f5]"
       >
         <LogOut className="h-4 w-4" />
