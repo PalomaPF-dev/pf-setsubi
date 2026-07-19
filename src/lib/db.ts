@@ -1682,6 +1682,31 @@ export async function dashboardCounts(
   };
 }
 
+/**
+ * 承認待ち（approval_status='pending'）の件数だけを返す軽量版（ヘッダーバッジ用）。
+ * approvalScope 指定時（管理者）は dashboardCounts と同じ承認ルーティングを適用し、
+ * 「提出者の指名承認者が未設定 or 自分」の記録だけを数える。単一クエリ。
+ */
+export async function pendingApprovalCount(
+  companyId: string,
+  approvalScope: ApprovalScope | null = null
+): Promise<number> {
+  await ensureSchema();
+  const sql = getSql();
+  const scopeActive = approvalScope != null;
+  const scopeLoginId = approvalScope?.loginId ?? null;
+  const rows = await sql`
+    SELECT COUNT(*) AS c FROM inspection_records r
+    WHERE r.company_id = ${companyId} AND r.approval_status = 'pending'
+      AND (${scopeActive}::boolean = false
+           OR NOT EXISTS (
+                SELECT 1 FROM users su
+                WHERE su.id = r.inspector_user_id
+                  AND su.approver_login_id IS NOT NULL
+                  AND su.approver_login_id IS DISTINCT FROM ${scopeLoginId}::text))`;
+  return Number(rows[0].c);
+}
+
 // ===== 点検記録CSVエクスポート用 =====
 
 /**

@@ -19,6 +19,7 @@ import {
   BookOpen,
   LayoutGrid,
 } from "lucide-react";
+import ApprovalNoticeBadge from "./ApprovalNoticeBadge";
 
 const NAV = [
   { href: "/", label: "ダッシュボード", icon: LayoutDashboard },
@@ -130,6 +131,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* PC サイドバー */}
       <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-[#e5e5e5] bg-white wide:flex">
         <Brand />
+        {/* 管理者向け: 自分宛ての承認待ちがあれば常時表示（全ページ共通） */}
+        <div className="px-5 pb-2 empty:hidden">
+          <ApprovalNoticeBadge />
+        </div>
         <div className="flex-1 overflow-y-auto py-2">
           <NavLinks />
         </div>
@@ -169,9 +174,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
-            <span className="whitespace-nowrap text-sm font-bold text-[#333333]">PF設備管理</span>
+            <span className="truncate whitespace-nowrap text-sm font-bold text-[#333333]">PF設備管理</span>
+          </div>
+          {/* 管理者向け: 承認待ちバッジ（モバイルは省スペース表記） */}
+          <div className="ml-auto">
+            <ApprovalNoticeBadge compact />
           </div>
         </header>
         <main className="print-main flex-1 overflow-y-auto">{children}</main>
