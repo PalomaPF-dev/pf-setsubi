@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -83,6 +83,18 @@ function LoginInner() {
       setDemoLoading(false);
     }
   }
+
+  // ポータルの「サンプル事例」リンク（/login?demo=1）から来たときはデモを自動開始する。
+  // StrictMode の二重マウント等で多重起動しないよう ref でガードする。
+  const demoAutoStartedRef = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("demo") !== "1") return;
+    if (demoAutoStartedRef.current || loading || demoLoading) return;
+    demoAutoStartedRef.current = true;
+    void startDemo();
+    // マウント時に一度だけ判定する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f7f5]">
