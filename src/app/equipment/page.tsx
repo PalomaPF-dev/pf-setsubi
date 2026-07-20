@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserRoleAndFactory } from "@/lib/authDb";
 import { getFactoryScope, scopedSiteId } from "@/lib/factoryScope";
 import {
   listEquipment,
@@ -47,6 +48,8 @@ export default async function EquipmentListPage({
   searchParams: Promise<{ q?: string; view?: string; site?: string; area?: string; condition?: string }>;
 }) {
   const session = await requireEntitledSession();
+  // 設備の登録・取込などマスタ編集の入口は管理者のみ表示（閲覧・出力は全員可）
+  const isAdmin = ((await getUserRoleAndFactory(session.userId))?.role ?? "admin") === "admin";
   const sp = await searchParams;
   const q = sp.q?.trim() || undefined;
   const areaId = sp.area || undefined;
@@ -136,20 +139,24 @@ export default async function EquipmentListPage({
                 </Link>
               </>
             )}
-            <Link
-              href="/equipment/import"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              <Upload className="h-4 w-4" />
-              CSVインポート
-            </Link>
-            <Link
-              href="/equipment/new"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-orange-700 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-800"
-            >
-              <Plus className="h-4 w-4" />
-              設備を登録
-            </Link>
+            {isAdmin && (
+              <>
+                <Link
+                  href="/equipment/import"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <Upload className="h-4 w-4" />
+                  CSVインポート
+                </Link>
+                <Link
+                  href="/equipment/new"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-orange-700 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-800"
+                >
+                  <Plus className="h-4 w-4" />
+                  設備を登録
+                </Link>
+              </>
+            )}
           </>
         }
       />
@@ -210,7 +217,7 @@ export default async function EquipmentListPage({
       ) : view === "map" ? (
         <MapView data={mapEquipment} areaId={areaId} />
       ) : listItems.length === 0 ? (
-        <EmptyState hasQuery={!!q || !!siteId || !!areaId} />
+        <EmptyState hasQuery={!!q || !!siteId || !!areaId} isAdmin={isAdmin} />
       ) : (
         <ListView items={listItems} today={today} />
       )}
@@ -651,14 +658,14 @@ function MapView({
   );
 }
 
-function EmptyState({ hasQuery }: { hasQuery: boolean }) {
+function EmptyState({ hasQuery, isAdmin }: { hasQuery: boolean; isAdmin: boolean }) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
       <Boxes className="mx-auto mb-3 h-10 w-10 text-slate-300" />
       <p className="text-sm text-slate-500">
         {hasQuery ? "該当する設備が見つかりませんでした。" : "まだ設備が登録されていません。"}
       </p>
-      {!hasQuery && (
+      {!hasQuery && isAdmin && (
         <Link
           href="/equipment/new"
           className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-800"

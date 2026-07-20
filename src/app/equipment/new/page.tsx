@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { getFactoryScope } from "@/lib/factoryScope";
 import { listCustomFieldDefs, listSitesWithAreas } from "@/lib/db";
 import { createEquipmentAction } from "@/lib/actions";
@@ -12,7 +12,7 @@ import DbErrorState from "@/components/DbErrorState";
 export const dynamic = "force-dynamic";
 
 export default async function NewEquipmentPage() {
-  const session = await requireEntitledSession();
+  const session = await requireAdminPage();
 
   let defs, sites;
   try {

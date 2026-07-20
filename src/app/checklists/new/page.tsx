@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import PageHeader from "@/components/PageHeader";
 import NewChecklistTabs from "@/components/NewChecklistTabs";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewChecklistPage() {
-  await requireEntitledSession();
+  await requireAdminPage();
   return (
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
       <Link

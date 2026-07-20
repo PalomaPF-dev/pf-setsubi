@@ -10,7 +10,7 @@ import {
   Save,
   Printer,
 } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { getFactoryScope, isEquipmentSiteVisible } from "@/lib/factoryScope";
 import {
   getProcedure,
@@ -55,7 +55,7 @@ export default async function ChecklistDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await requireEntitledSession();
+  const session = await requireAdminPage();
   const { id } = await params;
 
   let data: [
