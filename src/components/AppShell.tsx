@@ -21,11 +21,17 @@ import {
 } from "lucide-react";
 import ApprovalNoticeBadge from "./ApprovalNoticeBadge";
 
-const NAV = [
+const NAV: Array<{
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+}> = [
   { href: "/", label: "ダッシュボード", icon: LayoutDashboard },
   { href: "/equipment", label: "設備台帳", icon: Factory },
   { href: "/scan", label: "点検・スキャン", icon: QrCode },
-  { href: "/checklists", label: "点検手順書", icon: ClipboardList },
+  // 点検手順書（点検項目マスタ）はマスタ設定＝管理者のみ
+  { href: "/checklists", label: "点検手順書", icon: ClipboardList, adminOnly: true },
   { href: "/inspections", label: "点検履歴", icon: History },
   { href: "/actions", label: "処置管理", icon: Wrench },
   { href: "/schedule", label: "点検期限", icon: CalendarClock },
@@ -46,11 +52,11 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin: boolean }) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-1 px-3">
-      {NAV.map(({ href, label, icon: Icon }) => {
+      {NAV.filter((n) => !n.adminOnly || isAdmin).map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link
@@ -115,7 +121,7 @@ function UserFooter() {
   );
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, isAdmin = false }: { children: React.ReactNode; isAdmin?: boolean }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -136,7 +142,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <ApprovalNoticeBadge />
         </div>
         <div className="flex-1 overflow-y-auto py-2">
-          <NavLinks />
+          <NavLinks isAdmin={isAdmin} />
         </div>
         <UserFooter />
       </aside>
@@ -157,7 +163,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto py-2">
-              <NavLinks onNavigate={() => setDrawerOpen(false)} />
+              <NavLinks onNavigate={() => setDrawerOpen(false)} isAdmin={isAdmin} />
             </div>
             <UserFooter />
           </aside>

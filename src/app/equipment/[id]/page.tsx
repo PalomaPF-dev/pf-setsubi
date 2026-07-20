@@ -22,6 +22,7 @@ import {
   MapPinOff,
 } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserRoleAndFactory } from "@/lib/authDb";
 import { getFactoryScope, isEquipmentSiteVisible } from "@/lib/factoryScope";
 import {
   getEquipment,
@@ -73,6 +74,8 @@ export default async function EquipmentDetailPage({
   searchParams: Promise<{ item?: string }>;
 }) {
   const session = await requireEntitledSession();
+  // 設備の編集・割当・書類・状態操作などマスタ編集は管理者のみ表示（閲覧・点検開始は全員可）
+  const isAdmin = ((await getUserRoleAndFactory(session.userId))?.role ?? "admin") === "admin";
   const { id } = await params;
   const { item } = await searchParams;
 
@@ -205,13 +208,15 @@ export default async function EquipmentDetailPage({
           <p className="mt-1 font-mono text-sm text-slate-400">{equipment.managementNo}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/equipment/${id}/edit`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            <Pencil className="h-4 w-4" />
-            編集
-          </Link>
+          {isAdmin && (
+            <Link
+              href={`/equipment/${id}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <Pencil className="h-4 w-4" />
+              編集
+            </Link>
+          )}
         </div>
       </div>
 
@@ -290,7 +295,8 @@ export default async function EquipmentDetailPage({
                         </Link>
                       </div>
 
-                      {/* 周期編集（インライン） */}
+                      {/* 周期編集（インライン）＝マスタ設定＝管理者のみ */}
+                      {isAdmin && (
                       <details className="mt-2">
                         <summary className="inline-flex cursor-pointer items-center gap-1 text-xs text-slate-400 hover:text-slate-600">
                           <Settings2 className="h-3.5 w-3.5" />
@@ -342,14 +348,15 @@ export default async function EquipmentDetailPage({
                           </button>
                         </ConfirmForm>
                       </details>
+                      )}
                     </li>
                   );
                 })}
               </ul>
             )}
 
-            {/* 割当追加 */}
-            {availableProcedures.length > 0 ? (
+            {/* 割当追加＝マスタ設定＝管理者のみ */}
+            {isAdmin && (availableProcedures.length > 0 ? (
               <form action={assignProcedureAction} className="mt-4 rounded-xl bg-slate-50 p-3">
                 <div className="mb-2 text-xs font-medium text-slate-500">手順書を割り当てる</div>
                 <input type="hidden" name="equipmentId" value={id} />
@@ -405,7 +412,7 @@ export default async function EquipmentDetailPage({
                   </Link>
                 </div>
               )
-            )}
+            ))}
           </Card>
 
           {/* 数値推移 */}
@@ -535,7 +542,7 @@ export default async function EquipmentDetailPage({
 
           {/* 写真・書類 */}
           <Card title="写真・書類（設備写真・取扱説明書・図面 など）">
-            <DocumentUploadForm equipmentId={id} />
+            {isAdmin && <DocumentUploadForm equipmentId={id} />}
 
             {/* 設備写真のサムネイルグリッド */}
             {photoDocs.length > 0 && (
@@ -548,11 +555,13 @@ export default async function EquipmentDetailPage({
                     </a>
                     <div className="flex items-center justify-between gap-1 bg-white px-1.5 py-1">
                       <span className="truncate text-[10px] text-slate-500">{d.title}</span>
-                      <ConfirmForm action={deleteDocumentAction.bind(null, d.id, id)} message="この写真を削除しますか？">
-                        <button className="rounded p-0.5 text-slate-300 hover:bg-red-50 hover:text-red-500" aria-label="削除">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </ConfirmForm>
+                      {isAdmin && (
+                        <ConfirmForm action={deleteDocumentAction.bind(null, d.id, id)} message="この写真を削除しますか？">
+                          <button className="rounded p-0.5 text-slate-300 hover:bg-red-50 hover:text-red-500" aria-label="削除">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </ConfirmForm>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -585,11 +594,13 @@ export default async function EquipmentDetailPage({
                       >
                         <Download className="h-4 w-4" />
                       </a>
-                      <ConfirmForm action={deleteDocumentAction.bind(null, d.id, id)} message="この書類を削除しますか？">
-                        <button className="rounded p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500" aria-label="削除">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </ConfirmForm>
+                      {isAdmin && (
+                        <ConfirmForm action={deleteDocumentAction.bind(null, d.id, id)} message="この書類を削除しますか？">
+                          <button className="rounded p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500" aria-label="削除">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </ConfirmForm>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -621,32 +632,36 @@ export default async function EquipmentDetailPage({
             ) : placed ? (
               <>
                 <FactoryMap mapUrl={site.mapImageUrl} pins={mapPins} highlightId={id} />
-                <details className="mt-3">
-                  <summary className="inline-flex cursor-pointer items-center gap-1 text-xs text-slate-400 hover:text-slate-600">
-                    <MapPin className="h-3.5 w-3.5" />
-                    位置を変更
-                  </summary>
-                  <div className="mt-2 rounded-xl bg-slate-50 p-3">
-                    <FactoryMapEditor
-                      equipmentId={id}
-                      factory={{ id: site.id, name: site.name, mapUrl: site.mapImageUrl }}
-                      otherPins={otherPins}
-                      current={{ x: equipment.mapX!, y: equipment.mapY! }}
-                    />
-                  </div>
-                </details>
-                <ConfirmForm
-                  action={clearEquipmentMapPositionAction.bind(null, id)}
-                  message="マップへの配置を解除しますか？（設備や工場/職場の設定はそのまま残ります）"
-                  className="mt-2"
-                >
-                  <button className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                    <MapPinOff className="h-3.5 w-3.5" />
-                    配置を解除
-                  </button>
-                </ConfirmForm>
+                {isAdmin && (
+                  <>
+                    <details className="mt-3">
+                      <summary className="inline-flex cursor-pointer items-center gap-1 text-xs text-slate-400 hover:text-slate-600">
+                        <MapPin className="h-3.5 w-3.5" />
+                        位置を変更
+                      </summary>
+                      <div className="mt-2 rounded-xl bg-slate-50 p-3">
+                        <FactoryMapEditor
+                          equipmentId={id}
+                          factory={{ id: site.id, name: site.name, mapUrl: site.mapImageUrl }}
+                          otherPins={otherPins}
+                          current={{ x: equipment.mapX!, y: equipment.mapY! }}
+                        />
+                      </div>
+                    </details>
+                    <ConfirmForm
+                      action={clearEquipmentMapPositionAction.bind(null, id)}
+                      message="マップへの配置を解除しますか？（設備や工場/職場の設定はそのまま残ります）"
+                      className="mt-2"
+                    >
+                      <button className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                        <MapPinOff className="h-3.5 w-3.5" />
+                        配置を解除
+                      </button>
+                    </ConfirmForm>
+                  </>
+                )}
               </>
-            ) : (
+            ) : isAdmin ? (
               <details>
                 <summary className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-orange-300 text-sm font-medium text-orange-700 hover:bg-orange-50">
                   <MapPin className="h-4 w-4" />
@@ -661,6 +676,8 @@ export default async function EquipmentDetailPage({
                   />
                 </div>
               </details>
+            ) : (
+              <p className="text-sm text-slate-400">この設備はまだマップに配置されていません。</p>
             )}
           </Card>
 
@@ -682,7 +699,8 @@ export default async function EquipmentDetailPage({
             </div>
           </Card>
 
-          {/* 状態操作 */}
+          {/* 状態操作（廃止・復元・削除）＝マスタ設定＝管理者のみ */}
+          {isAdmin && (
           <Card title="状態操作">
             <div className="flex flex-col gap-2.5">
               {disposed ? (
@@ -713,6 +731,7 @@ export default async function EquipmentDetailPage({
               </p>
             </div>
           </Card>
+          )}
         </div>
       </div>
     </div>

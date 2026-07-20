@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { getFactoryScope, isEquipmentSiteVisible } from "@/lib/factoryScope";
 import { getEquipment, listCustomFieldDefs, listSitesWithAreas } from "@/lib/db";
 import { updateEquipmentAction } from "@/lib/actions";
@@ -16,7 +16,7 @@ export default async function EditEquipmentPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await requireEntitledSession();
+  const session = await requireAdminPage();
   const { id } = await params;
 
   let equipment, defs, sites;

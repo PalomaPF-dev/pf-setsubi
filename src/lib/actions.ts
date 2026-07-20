@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getStorage, isStorageConfigured } from "./storage";
-import { requireEntitledSession } from "./session";
+import { requireEntitledSession, requireAdminSession } from "./session";
 import {
   createEquipment,
   updateEquipment,
@@ -153,7 +153,7 @@ function readEquipmentInput(fd: FormData): Omit<EquipmentInput, "customValues"> 
 // ===== 設備（台帳） =====
 
 export async function createEquipmentAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readEquipmentInput(fd);
   if (!input.managementNo || !input.name) {
     throw new Error("管理番号と設備名は必須です");
@@ -166,7 +166,7 @@ export async function createEquipmentAction(fd: FormData): Promise<void> {
 }
 
 export async function updateEquipmentAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readEquipmentInput(fd);
   if (!input.managementNo || !input.name) {
     throw new Error("管理番号と設備名は必須です");
@@ -181,7 +181,7 @@ export async function updateEquipmentAction(id: string, fd: FormData): Promise<v
 
 /** 設備を廃止（ソフト）。点検記録・添付を残したまま retired にする。 */
 export async function disposeEquipmentAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await disposeEquipment(companyId, id);
   revalidatePath("/equipment");
   revalidatePath(`/equipment/${id}`);
@@ -191,7 +191,7 @@ export async function disposeEquipmentAction(id: string): Promise<void> {
 
 /** 廃止を取り消して稼働中に戻す。 */
 export async function restoreEquipmentAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await restoreEquipment(companyId, id);
   revalidatePath("/equipment");
   revalidatePath(`/equipment/${id}`);
@@ -201,7 +201,7 @@ export async function restoreEquipmentAction(id: string): Promise<void> {
 
 /** 完全削除（設備・添付・割当・点検記録・Blob をすべて削除）。通常は廃止を推奨。 */
 export async function deleteEquipmentAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const blobUrls = await collectEquipmentBlobUrls(companyId, id);
   await deleteEquipment(companyId, id);
   await deleteBlobs(blobUrls);
@@ -215,7 +215,7 @@ export async function deleteEquipmentAction(id: string): Promise<void> {
 // ===== 添付（写真・PDF） =====
 
 export async function uploadDocumentAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const equipmentId = str(fd, "equipmentId");
   const docType = (strOrNull(fd, "docType") ?? "other") as DocType;
   const file = fd.get("file");
@@ -251,7 +251,7 @@ export async function uploadDocumentAction(fd: FormData): Promise<void> {
 }
 
 export async function deleteDocumentAction(id: string, equipmentId: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const doc = await getDocument(companyId, id);
   await deleteDocument(companyId, id);
   if (doc?.blobUrl) await deleteBlobs([doc.blobUrl]);
@@ -274,7 +274,7 @@ function readCustomFieldDefInput(fd: FormData) {
 }
 
 export async function createCustomFieldDefAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readCustomFieldDefInput(fd);
   if (!input.name) throw new Error("項目名は必須です");
   if (input.fieldType === "select" && (!input.options || input.options.length === 0)) {
@@ -293,7 +293,7 @@ export async function createCustomFieldDefAction(fd: FormData): Promise<void> {
 }
 
 export async function updateCustomFieldDefAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readCustomFieldDefInput(fd);
   if (!input.name) throw new Error("項目名は必須です");
   await updateCustomFieldDef(companyId, id, input);
@@ -302,14 +302,14 @@ export async function updateCustomFieldDefAction(id: string, fd: FormData): Prom
 }
 
 export async function deleteCustomFieldDefAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteCustomFieldDef(companyId, id);
   revalidatePath("/settings");
   revalidatePath("/equipment");
 }
 
 export async function moveCustomFieldDefAction(id: string, dir: "up" | "down"): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await moveCustomFieldDef(companyId, id, dir);
   revalidatePath("/settings");
 }
@@ -317,7 +317,7 @@ export async function moveCustomFieldDefAction(id: string, dir: "up" | "down"): 
 // ===== 点検手順書 =====
 
 export async function createProcedureAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (!name) throw new Error("手順書名は必須です");
   const id = await createProcedure(companyId, {
@@ -329,7 +329,7 @@ export async function createProcedureAction(fd: FormData): Promise<void> {
 }
 
 export async function updateProcedureAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (!name) throw new Error("手順書名は必須です");
   await updateProcedure(companyId, id, {
@@ -342,7 +342,7 @@ export async function updateProcedureAction(id: string, fd: FormData): Promise<v
 
 /** 手順書の削除（記録があればアーカイブ）。割当はどちらの場合も解除される。物理削除時はメディアも回収。 */
 export async function deleteProcedureAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const mediaUrls = await collectProcedureMediaUrls(companyId, id);
   const outcome = await deleteOrArchiveProcedure(companyId, id);
   if (outcome === "deleted") await deleteBlobs(mediaUrls);
@@ -370,7 +370,7 @@ function readItemInput(fd: FormData, procedureId: string): InspectionItemInput {
 }
 
 export async function addInspectionItemAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const procedureId = str(fd, "procedureId");
   if (!procedureId) throw new Error("手順書が指定されていません");
   const input = readItemInput(fd, procedureId);
@@ -380,7 +380,7 @@ export async function addInspectionItemAction(fd: FormData): Promise<void> {
 }
 
 export async function updateInspectionItemAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const procedureId = str(fd, "procedureId");
   const input = readItemInput(fd, procedureId);
   if (!input.label) throw new Error("項目名は必須です");
@@ -389,7 +389,7 @@ export async function updateInspectionItemAction(id: string, fd: FormData): Prom
 }
 
 export async function deleteInspectionItemAction(id: string, procedureId: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const mediaUrls = await collectItemMediaUrls(companyId, id);
   const outcome = await deleteOrArchiveInspectionItem(companyId, id, procedureId);
   if (outcome === "deleted") await deleteBlobs(mediaUrls);
@@ -401,7 +401,7 @@ export async function moveInspectionItemAction(
   procedureId: string,
   dir: "up" | "down"
 ): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await moveInspectionItem(companyId, id, procedureId, dir);
   revalidatePath(`/checklists/${procedureId}`);
 }
@@ -409,7 +409,7 @@ export async function moveInspectionItemAction(
 // ===== 割当（点検スケジュール） =====
 
 export async function assignProcedureAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const equipmentId = str(fd, "equipmentId");
   const procedureId = str(fd, "procedureId");
   if (!equipmentId || !procedureId) throw new Error("手順書を選択してください");
@@ -429,7 +429,7 @@ export async function assignProcedureAction(fd: FormData): Promise<void> {
 }
 
 export async function updateAssignmentAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const equipmentId = str(fd, "equipmentId");
   const intervalUnit = strOrNull(fd, "intervalUnit") ?? "months";
   const intervalValue = intOrNull(fd, "intervalValue");
@@ -445,7 +445,7 @@ export async function updateAssignmentAction(id: string, fd: FormData): Promise<
 }
 
 export async function unassignProcedureAction(id: string, equipmentId: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await unassignProcedure(companyId, id);
   revalidatePath(`/equipment/${equipmentId}`);
   revalidatePath("/schedule");
@@ -834,7 +834,7 @@ export async function resubmitInspectionAction(recordId: string): Promise<{ erro
 // ===== 採番ルール設定 =====
 
 export async function updateManagementNoSettingsAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const prefix = str(fd, "prefix") || "S";
   const digits = Math.max(1, Math.min(8, parseInt(str(fd, "digits") || "4", 10)));
   const seq = Math.max(1, parseInt(str(fd, "seq") || "1", 10));
@@ -845,7 +845,7 @@ export async function updateManagementNoSettingsAction(fd: FormData): Promise<vo
 // ===== 承認ワークフロー設定（承認者メール） =====
 
 export async function updateApprovalSettingsAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const approverEmail = strOrNull(fd, "approverEmail");
   await updateApprovalSettings(companyId, { approverEmail });
   revalidatePath("/settings");
@@ -940,7 +940,7 @@ export async function deleteCorrectiveActionAction(id: string, equipmentId: stri
 
 /** テンプレートから手順書+項目を一括作成（key はサーバー側で解決するため改ざん不能）。 */
 export async function createProcedureFromTemplateAction(key: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const tpl = getProcedureTemplate(key);
   if (!tpl) throw new Error("テンプレートが見つかりません");
   const id = await createProcedureFromTemplate(companyId, tpl);
@@ -951,7 +951,7 @@ export async function createProcedureFromTemplateAction(key: string): Promise<vo
 // ===== 工場・職場マスタ =====
 
 export async function createSiteAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (!name) throw new Error("工場名は必須です");
   await createSite(companyId, { name });
@@ -961,7 +961,7 @@ export async function createSiteAction(fd: FormData): Promise<void> {
 }
 
 export async function updateSiteAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (!name) throw new Error("工場名は必須です");
   await updateSite(companyId, id, { name });
@@ -971,13 +971,13 @@ export async function updateSiteAction(id: string, fd: FormData): Promise<void> 
 }
 
 export async function moveSiteAction(id: string, dir: "up" | "down"): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await moveSite(companyId, id, dir);
   revalidatePath("/settings");
 }
 
 export async function deleteSiteAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const mapUrl = await deleteSite(companyId, id);
   if (mapUrl) await deleteBlobs([mapUrl]);
   revalidatePath("/settings");
@@ -987,7 +987,7 @@ export async function deleteSiteAction(id: string): Promise<void> {
 
 /** マップ画像の設定（アップロード済み URL を保存）/ null で解除。旧画像は Blob からも削除。 */
 export async function setSiteMapImageAction(id: string, url: string | null): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   if (url !== null && !isOwnMediaUrl(url, companyId)) {
     throw new Error("画像URLが不正です");
   }
@@ -998,7 +998,7 @@ export async function setSiteMapImageAction(id: string, url: string | null): Pro
 }
 
 export async function createAreaAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const siteId = str(fd, "siteId");
   const name = str(fd, "name");
   if (!siteId || !name) throw new Error("職場名は必須です");
@@ -1008,7 +1008,7 @@ export async function createAreaAction(fd: FormData): Promise<void> {
 }
 
 export async function updateAreaAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (!name) throw new Error("職場名は必須です");
   await updateArea(companyId, id, { name });
@@ -1017,13 +1017,13 @@ export async function updateAreaAction(id: string, fd: FormData): Promise<void> 
 }
 
 export async function moveAreaAction(id: string, siteId: string, dir: "up" | "down"): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await moveArea(companyId, id, siteId, dir);
   revalidatePath("/settings");
 }
 
 export async function deleteAreaAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteArea(companyId, id);
   revalidatePath("/settings");
   revalidatePath("/equipment");
@@ -1035,7 +1035,7 @@ export async function setEquipmentMapPositionAction(
   equipmentId: string,
   fd: FormData
 ): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const x = floatOrNull(fd, "x");
   const y = floatOrNull(fd, "y");
   if (x == null || y == null) throw new Error("マップ上の位置を指定してください");
@@ -1045,7 +1045,7 @@ export async function setEquipmentMapPositionAction(
 }
 
 export async function clearEquipmentMapPositionAction(equipmentId: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await updateEquipmentMapPosition(companyId, equipmentId, null);
   revalidatePath(`/equipment/${equipmentId}`);
   revalidatePath("/equipment");
@@ -1059,7 +1059,7 @@ export async function setItemSpotPhotoAction(
   procedureId: string,
   url: string | null
 ): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   if (url !== null && !isOwnMediaUrl(url, companyId)) {
     throw new Error("画像URLが不正です");
   }
@@ -1075,7 +1075,7 @@ export async function setProcedureDiagramAction(
   procedureId: string,
   url: string | null
 ): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   if (url !== null && !isOwnMediaUrl(url, companyId)) {
     throw new Error("画像URLが不正です");
   }
@@ -1091,7 +1091,7 @@ export async function setItemMapPositionAction(
   x: number,
   y: number
 ): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("位置が不正です");
   await updateItemMapPosition(companyId, itemId, { x, y });
   revalidatePath(`/checklists/${procedureId}`);
@@ -1102,7 +1102,7 @@ export async function clearItemMapPositionAction(
   itemId: string,
   procedureId: string
 ): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await updateItemMapPosition(companyId, itemId, null);
   revalidatePath(`/checklists/${procedureId}`);
 }
@@ -1121,7 +1121,7 @@ export interface AddReferenceMediaPayload {
 export async function addItemReferenceMediaAction(
   payload: AddReferenceMediaPayload
 ): Promise<{ error?: string }> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   if (payload.mediaType !== "photo" && payload.mediaType !== "audio" && payload.mediaType !== "video") {
     return { error: "メディア種別が不正です" };
   }
@@ -1153,7 +1153,7 @@ export async function deleteItemReferenceMediaAction(
   id: string,
   procedureId: string
 ): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const url = await deleteItemReferenceMedia(companyId, id);
   if (url) await deleteBlobs([url]);
   revalidatePath(`/checklists/${procedureId}`);

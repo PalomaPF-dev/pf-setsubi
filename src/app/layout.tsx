@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
+import { getOptionalSession } from "@/lib/session";
+import { getUserRoleAndFactory } from "@/lib/authDb";
 
 export const metadata: Metadata = {
   title: "PF設備管理",
@@ -18,12 +20,24 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // ナビの「点検手順書」など、マスタ系リンクの出し分け用に管理者かどうかを解決する。
+  // role はセッション（JWT）に載せていないため DB から取得する。未ログイン時は false。
+  let isAdmin = false;
+  try {
+    const sessionUser = await getOptionalSession();
+    if (sessionUser) {
+      const rf = await getUserRoleAndFactory(sessionUser.id);
+      isAdmin = (rf?.role ?? "admin") === "admin";
+    }
+  } catch {
+    isAdmin = false;
+  }
   return (
     <html lang="ja">
       <body className="antialiased">
         <Providers>
-          <AppShell>{children}</AppShell>
+          <AppShell isAdmin={isAdmin}>{children}</AppShell>
         </Providers>
       </body>
     </html>

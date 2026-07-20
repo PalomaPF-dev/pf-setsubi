@@ -58,6 +58,44 @@ export async function requireEntitledSession(): Promise<{
   return s;
 }
 
+/**
+ * ログイン中ユーザーの役割（role）を返す。role が未設定（旧データ等）は "admin" 扱い
+ * （既存の単独管理者運用を壊さないための緩いフォールバック。プロビジョニング済みの
+ * 一般ユーザーは role='member' が入るため確実に制限される）。
+ * Server Component でマスタ系の出し分け（isAdmin）に使う。
+ */
+export async function getSessionRole(): Promise<"admin" | "member"> {
+  const s = await requireEntitledSession();
+  const rf = await getUserRoleAndFactory(s.userId);
+  return rf?.role ?? "admin";
+}
+
+/**
+ * マスタ更新の Server Action 用: 管理者（role=admin）のみ許可。
+ * 一般ユーザー（member）はエラー（UI 側でもフォームを出さないが、サーバー側でも必ず防ぐ）。
+ */
+export async function requireAdminSession() {
+  const s = await requireEntitledSession();
+  const rf = await getUserRoleAndFactory(s.userId);
+  if ((rf?.role ?? "admin") !== "admin") {
+    throw new Error("この操作は管理者のみ実行できます");
+  }
+  return s;
+}
+
+/**
+ * マスタ系ページ用: 管理者以外は "/" にリダイレクトして描画させない。
+ * 設備の登録/編集/取込・点検手順書などのサーバーコンポーネントで使う。
+ */
+export async function requireAdminPage() {
+  const s = await requireEntitledSession();
+  const rf = await getUserRoleAndFactory(s.userId);
+  if ((rf?.role ?? "admin") !== "admin") {
+    redirect("/");
+  }
+  return s;
+}
+
 /** リダイレクトせず、未ログインなら null を返す（任意表示用）。 */
 export async function getOptionalSession() {
   const session = await getServerSession(authOptions);

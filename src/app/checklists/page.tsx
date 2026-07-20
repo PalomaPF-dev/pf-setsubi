@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus, ClipboardList, ListChecks, Boxes } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { listProcedures } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import type { InspectionProcedure } from "@/lib/types";
@@ -10,7 +10,7 @@ import DbErrorState from "@/components/DbErrorState";
 export const dynamic = "force-dynamic";
 
 export default async function ChecklistsPage() {
-  const session = await requireEntitledSession();
+  const session = await requireAdminPage();
 
   let procedures: InspectionProcedure[];
   try {

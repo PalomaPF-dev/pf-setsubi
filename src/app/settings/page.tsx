@@ -60,6 +60,8 @@ export default async function SettingsPage() {
   }
 
   const preview = `${s.prefix}-${String(s.seq).padStart(s.digits, "0")}`;
+  // マスタ設定（採番・承認・カスタム項目・工場/職場）は管理者のみ編集可
+  const isAdmin = (rf?.role ?? "admin") === "admin";
   // 所属工場による表示制限ユーザーには、工場・職場の一覧も自工場のみ見せる
   const restrictedFactory = rf && rf.role !== "admin" ? rf.factory : null;
   if (restrictedFactory) {
@@ -77,6 +79,9 @@ export default async function SettingsPage() {
         {/* 作業者管理（アカウント管理はポータル。ログイン中なら誰でも操作可） */}
         <WorkerManagement />
 
+        {/* 以下のマスタ設定（採番・承認・カスタム項目・工場/職場）は管理者のみ */}
+        {isAdmin && (
+          <>
         {/* 採番ルール */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="mb-1 text-sm font-bold text-slate-700">管理番号 採番ルール</h2>
@@ -413,6 +418,9 @@ export default async function SettingsPage() {
             </SubmitButton>
           </form>
         </div>
+
+          </>
+        )}
 
         {/* 危険な操作（アカウント削除＝退会）。デモでは出さない */}
         {!isDemo && <DeleteAccountSection />}

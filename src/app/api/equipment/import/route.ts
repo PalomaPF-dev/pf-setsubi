@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserRoleAndFactory } from "@/lib/authDb";
 import { bulkCreateEquipment, listCustomFieldDefs } from "@/lib/db";
 import type { EquipmentInput } from "@/lib/db";
 import { LEDGER_IMPORT_HEADERS } from "@/lib/ledger";
@@ -44,7 +45,12 @@ function parseDate(v: string): string | null {
 
 export async function POST(req: Request): Promise<NextResponse> {
   try {
-    const { companyId } = await requireEntitledSession();
+    const { companyId, userId } = await requireEntitledSession();
+    // 設備マスタの一括取り込みは管理者のみ
+    const rf = await getUserRoleAndFactory(userId);
+    if ((rf?.role ?? "admin") !== "admin") {
+      return NextResponse.json({ error: "この操作は管理者のみ実行できます" }, { status: 403 });
+    }
     const body = await req.json();
     const rows: string[][] = body.rows;
     if (!Array.isArray(rows) || rows.length === 0) {
