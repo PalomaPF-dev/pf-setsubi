@@ -166,12 +166,15 @@ function LoginInner() {
             )}
           </button>
 
-          {/* ポータルで発行された社員番号アカウント（pending）の初回パスワード設定 */}
+          {/* ポータル一括ログイン（ポータルでログイン済みなら各アプリは自動ログイン） */}
           <div className="mt-4 rounded-lg border border-[#f27524]/40 bg-[#fef3ec] px-3 py-2.5 text-center text-sm">
-            <Link href="/first-login" className="font-semibold text-[#f27524] hover:underline">
-              初めてログインする方はこちら（パスワード設定）
-            </Link>
+            <a href="https://portal.paloma-pf.com/" className="font-semibold text-[#f27524] hover:underline">
+              ポータルから一括ログイン
+            </a>
           </div>
+          <p className="mt-2 text-center text-xs text-[#707070]">
+            ポータルでログインすると各アプリは自動でログインされます
+          </p>
 
           <div className="mt-3 text-center text-sm">
             <Link href="/password-reset" className="text-[#f27524] hover:underline">
