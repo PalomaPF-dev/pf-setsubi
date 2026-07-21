@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { Plus, ClipboardList, ListChecks, Boxes } from "lucide-react";
+import { Plus, ClipboardList, ListChecks, Boxes, Trash2 } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { listProcedures } from "@/lib/db";
+import { deleteProcedureAction } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
 import type { InspectionProcedure } from "@/lib/types";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
+import ConfirmForm from "@/components/ConfirmForm";
 
 export const dynamic = "force-dynamic";
 
@@ -46,12 +48,24 @@ export default async function ChecklistsPage() {
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {procedures.map((p) => (
-            <li key={p.id}>
+            <li key={p.id} className="relative">
+              <ConfirmForm
+                action={deleteProcedureAction.bind(null, p.id)}
+                message="この手順書を削除しますか？割当が解除されます。点検記録がある場合は手順書はアーカイブされ履歴は残ります。"
+                className="absolute right-2 top-2 z-10"
+              >
+                <button
+                  className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500"
+                  aria-label="手順書を削除"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </ConfirmForm>
               <Link
                 href={`/checklists/${p.id}`}
                 className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 hover:border-orange-300 hover:shadow-sm active:bg-slate-50"
               >
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-2 pr-7">
                   <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <span className="min-w-0 truncate font-medium text-slate-800">{p.name}</span>
                 </div>
