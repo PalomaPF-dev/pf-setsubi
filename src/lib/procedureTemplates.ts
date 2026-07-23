@@ -220,6 +220,53 @@ export const PROCEDURE_TEMPLATES: ProcedureTemplate[] = [
       { label: "【6ヶ月ごと】トリム等周辺機械：摺動部摩耗確認・部品交換等", itemType: "ok_ng", instruction: "6ヶ月周期。マニュアル参照・メーカー依頼。" },
     ],
   },
+  {
+    key: "oxynon-daily",
+    name: "オキシノン炉 日常点検",
+    description:
+      "関東冶金工業 オキシノン炉の日常点検（整理番号 D1N-063-A / 帳票 J-210）。判定は良好=○（OK）／不具合=×（NG）、数値項目は測定値を記入。各項目は設備使用前に実施する。",
+    category: "熱処理炉",
+    recommendedInterval: "毎日（始業前）",
+    items: [
+      { label: "非常停止ボタンを押して運転準備が落ちるか", itemType: "ok_ng", instruction: "安全。非常停止ボタンで運転準備が確実に落ちること。", requireCommentOnNg: true },
+      { label: "安全カバーが確実に取付され破損がないか", itemType: "ok_ng", instruction: "安全。取付状態と破損を目視確認。" },
+      { label: "設備内に不要な物が無いか", itemType: "ok_ng", instruction: "安全。設備内の異物・不要物を確認。" },
+      { label: "コンベア動作中に異音が無いか", itemType: "ok_ng", instruction: "駆動部。動作中の異音を確認。" },
+      { label: "アルゴンガス使用量（雰囲気ガス増量弁が「開」）", itemType: "numeric", instruction: "安全。増量弁が「開」で 30〜50m³/h。測定値を記入。", unit: "m³/h", min: 30, max: 50 },
+      { label: "O2濃度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。O2濃度アラートが発生していないこと。", requireCommentOnNg: true },
+      { label: "CO濃度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。CO濃度アラートが発生していないこと。", requireCommentOnNg: true },
+      { label: "炉内圧力：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。炉内圧力アラートが発生していないこと。", requireCommentOnNg: true },
+      { label: "炉内温度・乾燥炉温度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。炉内温度・乾燥炉温度アラートが発生していないこと。", requireCommentOnNg: true },
+    ],
+  },
+  {
+    key: "oxynon-monthly",
+    name: "オキシノン炉 月次点検（設備点検）",
+    description:
+      "関東冶金工業 オキシノン炉の設備点検（整理番号 ZK-845 / 帳票 Z-008）。周期は毎月。判定は良好=○（OK）／不具合=×（NG）、アラーム設定値・速度などの数値項目は測定値を記入。",
+    category: "熱処理炉",
+    recommendedInterval: "1か月ごと",
+    items: [
+      { label: "加熱室：各ボルトの増締め", itemType: "ok_ng", instruction: "増締めを実施。" },
+      { label: "駆動部：コンベア動作中に異音が無いか", itemType: "ok_ng", instruction: "目視・聴音で確認。" },
+      { label: "全般：非常停止ボタンを押して運転準備が落ちるか", itemType: "ok_ng", instruction: "目視で運転準備の落ちを確認。" },
+      { label: "全般：安全カバーに破損がないか", itemType: "ok_ng", instruction: "目視で破損を確認。" },
+      { label: "全般：設備内に不要な物が無いか", itemType: "ok_ng", instruction: "目視で異物・不要物を確認。" },
+      { label: "制御盤：O2濃度アラーム設定値（100ppm以下）", itemType: "numeric", instruction: "設定値が100ppm以下であること。測定値を記入。", unit: "ppm", max: 100 },
+      { label: "制御盤：CO濃度アラーム設定値（1000ppm以下）", itemType: "numeric", instruction: "設定値が1000ppm以下であること。測定値を記入。", unit: "ppm", max: 1000 },
+      { label: "乾燥炉温度 Zone1 アラーム設定値（100〜300℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 100, max: 300 },
+      { label: "乾燥炉温度 Zone2 アラーム設定値（130〜330℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 130, max: 330 },
+      { label: "炉温度 前室 アラーム設定値（50〜350℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 50, max: 350 },
+      { label: "炉温度 排ガス燃焼室 アラーム設定値（700〜850℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 700, max: 850 },
+      { label: "炉温度 脱バインダー炉 Zone1 アラーム設定値（400〜600℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 400, max: 600 },
+      { label: "炉温度 脱バインダー炉 Zone2 アラーム設定値（450〜650℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 450, max: 650 },
+      { label: "炉温度 加熱炉 Zone1 アラーム設定値（900〜1000℃）", itemType: "numeric", instruction: "設定値を記入。※原本は「900〜100℃」と記載。誤記の可能性があり基準値は要確認。", unit: "℃", min: 900, max: 1000 },
+      { label: "炉温度 加熱炉 Zone2 アラーム設定値（1000〜1100℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 1000, max: 1100 },
+      { label: "炉温度 加熱炉 Zone3 アラーム設定値（1080〜1180℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 1080, max: 1180 },
+      { label: "炉温度 加熱炉 Zone4 アラーム設定値（1080〜1180℃）", itemType: "numeric", instruction: "設定値を記入。", unit: "℃", min: 1080, max: 1180 },
+      { label: "ベルト速度（170〜270cm/min）", itemType: "numeric", instruction: "測定値を記入。", unit: "cm/min", min: 170, max: 270 },
+    ],
+  },
 ];
 
 export function getProcedureTemplate(key: string): ProcedureTemplate | undefined {
