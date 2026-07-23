@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { FileUp } from "lucide-react";
 import { createProcedureAction, createProcedureFromTemplateAction } from "@/lib/actions";
 import { PROCEDURE_TEMPLATES, type ProcedureTemplateItem } from "@/lib/procedureTemplates";
 import SubmitButton from "@/components/SubmitButton";
@@ -53,6 +55,13 @@ export default function NewChecklistTabs() {
         >
           テンプレートから作成
         </button>
+        <Link
+          href="/checklists/import"
+          className="-mb-px ml-auto inline-flex items-center gap-1 border-b-2 border-transparent px-1 pb-2 text-sm text-orange-700 hover:text-orange-800"
+        >
+          <FileUp className="h-3.5 w-3.5" />
+          Excel/PDFから取り込み
+        </Link>
       </div>
 
       {tab === "blank" ? (

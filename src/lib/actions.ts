@@ -51,6 +51,7 @@ import {
   deleteCorrectiveAction,
   getItemResultContext,
   createProcedureFromTemplate,
+  createProcedureWithItems,
   updateManagementNoSettings,
   createSite,
   updateSite,
@@ -946,6 +947,74 @@ export async function createProcedureFromTemplateAction(key: string): Promise<vo
   const id = await createProcedureFromTemplate(companyId, tpl);
   revalidatePath("/checklists");
   redirect(`/checklists/${id}`);
+}
+
+// ===== 点検表ファイル取り込み（Excel/PDF/CSV） =====
+
+export interface ImportProcedurePayload {
+  name: string;
+  description?: string | null;
+  items: {
+    label: string;
+    itemType: string;
+    instruction?: string | null;
+    unit?: string | null;
+    minValue?: number | null;
+    maxValue?: number | null;
+  }[];
+}
+
+const IMPORT_ITEM_TYPES: ItemType[] = ["ok_ng", "numeric", "text", "photo"];
+const MAX_IMPORT_PROCEDURES = 30;
+const MAX_IMPORT_ITEMS = 200;
+
+/**
+ * 解析済みドラフト（プレビュー画面でユーザーが確認・修正したもの）から
+ * 手順書+項目を一括作成する。
+ */
+export async function importProceduresAction(
+  payload: ImportProcedurePayload[]
+): Promise<{ created: { id: string; name: string }[] }> {
+  const { companyId } = await requireAdminSession();
+  if (!Array.isArray(payload) || payload.length === 0) {
+    throw new Error("取り込む手順書がありません");
+  }
+  if (payload.length > MAX_IMPORT_PROCEDURES) {
+    throw new Error(`一度に取り込めるのは ${MAX_IMPORT_PROCEDURES} 件までです`);
+  }
+  const created: { id: string; name: string }[] = [];
+  for (const draft of payload) {
+    const name = String(draft.name ?? "").trim().slice(0, 120);
+    if (!name) throw new Error("手順書名は必須です");
+    const rawItems = Array.isArray(draft.items) ? draft.items.slice(0, MAX_IMPORT_ITEMS) : [];
+    const items = rawItems
+      .map((it) => {
+        const label = String(it.label ?? "").trim().slice(0, 200);
+        const itemType = IMPORT_ITEM_TYPES.includes(it.itemType as ItemType)
+          ? (it.itemType as ItemType)
+          : "ok_ng";
+        const num = (v: unknown): number | null =>
+          typeof v === "number" && Number.isFinite(v) ? v : null;
+        return {
+          label,
+          itemType,
+          instruction: it.instruction ? String(it.instruction).trim().slice(0, 500) || null : null,
+          unit: it.unit ? String(it.unit).trim().slice(0, 20) || null : null,
+          minValue: num(it.minValue),
+          maxValue: num(it.maxValue),
+        };
+      })
+      .filter((it) => it.label);
+    if (items.length === 0) throw new Error(`「${name}」に点検項目がありません`);
+    const id = await createProcedureWithItems(companyId, {
+      name,
+      description: draft.description ? String(draft.description).trim().slice(0, 500) || null : null,
+      items,
+    });
+    created.push({ id, name });
+  }
+  revalidatePath("/checklists");
+  return { created };
 }
 
 // ===== 工場・職場マスタ =====

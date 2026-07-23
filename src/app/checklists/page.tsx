@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, ClipboardList, ListChecks, Boxes, Trash2 } from "lucide-react";
+import { Plus, ClipboardList, ListChecks, Boxes, Trash2, FileUp } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { listProcedures } from "@/lib/db";
 import { deleteProcedureAction } from "@/lib/actions";
@@ -33,13 +33,22 @@ export default async function ChecklistsPage() {
         title="点検手順書"
         description="点検項目のテンプレートを作り、設備に割り当てて使います"
         action={
-          <Link
-            href="/checklists/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-700 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-800"
-          >
-            <Plus className="h-4 w-4" />
-            手順書を作成
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/checklists/import"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-medium text-orange-700 hover:bg-orange-50"
+            >
+              <FileUp className="h-4 w-4" />
+              Excel/PDF取込
+            </Link>
+            <Link
+              href="/checklists/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-orange-700 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-800"
+            >
+              <Plus className="h-4 w-4" />
+              手順書を作成
+            </Link>
+          </div>
         }
       />
 
