@@ -2019,6 +2019,43 @@ export async function createProcedureFromTemplate(
   return procedureId;
 }
 
+export interface ProcedureWithItemsInput {
+  name: string;
+  description?: string | null;
+  items: Omit<InspectionItemInput, "procedureId">[];
+}
+
+/**
+ * 手順書+項目を一括作成（Excel/PDF取り込み等の任意項目リスト用）。
+ * createProcedureFromTemplate と同様に id を事前生成し sql.transaction で原子的に INSERT。
+ */
+export async function createProcedureWithItems(
+  companyId: string,
+  input: ProcedureWithItemsInput
+): Promise<string> {
+  await ensureSchema();
+  const sql = getSql();
+  const procedureId = crypto.randomUUID();
+  await sql.transaction([
+    sql`
+      INSERT INTO inspection_procedures (id, company_id, name, description)
+      VALUES (${procedureId}, ${companyId}, ${input.name}, ${input.description ?? null})`,
+    ...input.items.map((it, i) => {
+      const v = normalizeItemInput({ ...it, procedureId });
+      return sql`
+        INSERT INTO inspection_items (
+          company_id, procedure_id, sort_order, label, item_type, instruction,
+          unit, min_value, max_value, photo_mode, require_comment_on_ng
+        ) VALUES (
+          ${companyId}, ${procedureId}, ${i}, ${v.label}, ${v.itemType},
+          ${v.instruction ?? null}, ${v.unit}, ${v.minValue}, ${v.maxValue},
+          ${v.photoMode}, ${v.requireCommentOnNg ?? false}
+        )`;
+    }),
+  ]);
+  return procedureId;
+}
+
 // ===== 工場（サイト）・職場（エリア） =====
 
 function mapSite(r: any): Site {
