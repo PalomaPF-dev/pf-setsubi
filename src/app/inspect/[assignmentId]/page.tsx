@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClipboardList } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserRoleAndFactory, type UserRole } from "@/lib/authDb";
 import { getFactoryScope, isEquipmentSiteVisible } from "@/lib/factoryScope";
 import {
   getAssignment,
@@ -40,6 +41,7 @@ export default async function InspectPage({
   let procedure: InspectionProcedure | null = null;
   let items: InspectionItem[] = [];
   let workerRoster: string[] = [];
+  let userRole: UserRole = "member";
   // 正常見本メディア（Map は Client Component へ渡せないので Object に変換して渡す）
   let referenceMedia: Record<string, ItemReferenceMedia[]> = {};
   try {
@@ -48,14 +50,17 @@ export default async function InspectPage({
       let refMap: Map<string, ItemReferenceMedia[]>;
       let workers;
       let scope;
-      [equipment, procedure, items, refMap, workers, scope] = await Promise.all([
+      let rf;
+      [equipment, procedure, items, refMap, workers, scope, rf] = await Promise.all([
         getEquipment(session.companyId, assignment.equipmentId),
         getProcedure(session.companyId, assignment.procedureId),
         listInspectionItems(session.companyId, assignment.procedureId),
         listReferenceMediaForProcedure(session.companyId, assignment.procedureId),
         listWorkers(session.companyId),
         getFactoryScope(session.companyId, session.userId),
+        getUserRoleAndFactory(session.userId),
       ]);
+      userRole = rf?.role ?? "member";
       // 所属工場による表示制限（他工場の設備の点検は開始できない＝notFound）
       if (!isEquipmentSiteVisible(scope, equipment?.siteId ?? null)) {
         assignment = null;
@@ -108,6 +113,7 @@ export default async function InspectPage({
       diagramUrl={procedure?.diagramUrl ?? null}
       workerRoster={workerRoster}
       userName={session.userName}
+      userRole={userRole}
     />
   );
 }

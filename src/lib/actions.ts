@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getStorage, isStorageConfigured } from "./storage";
 import { requireEntitledSession, requireAdminSession } from "./session";
+import { getUserRoleAndFactory } from "./authDb";
 import {
   createEquipment,
   updateEquipment,
@@ -708,8 +709,14 @@ export async function completeInspectionAction(
     assignment.intervalDays
   );
 
-  // 作業者名: 開始時に選択/入力した名前を優先。監査用に inspectorUserId は常にログインユーザー。
-  const inspector = (payload.inspectorName ?? "").trim() || userName || "（不明）";
+  // 作業者名: role='worker' は送信値を無視して必ず本人名で保存（サーバー側で強制）。
+  // admin/member は開始時に選択/入力した名前（代理入力）を優先。
+  // 監査用に inspectorUserId は常にログインユーザー。
+  const role = (await getUserRoleAndFactory(userId))?.role ?? "admin";
+  const inspector =
+    role === "worker"
+      ? userName || "（不明）"
+      : (payload.inspectorName ?? "").trim() || userName || "（不明）";
 
   let recordId: string;
   try {
@@ -856,9 +863,13 @@ export async function updateApprovalSettingsAction(fd: FormData): Promise<void> 
 
 /** 処置の起票。itemResultId がある場合は DB から記録・設備・項目名を導出（クライアント値は信用しない）。 */
 export async function createCorrectiveActionAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId, userId, userName } = await requireEntitledSession();
   const title = str(fd, "title");
   if (!title) throw new Error("処置のタイトルは必須です");
+
+  // 担当者: role='worker' は送信値を無視して必ず本人名で保存（サーバー側で強制）
+  const role = (await getUserRoleAndFactory(userId))?.role ?? "admin";
+  const assignee = role === "worker" ? userName || null : strOrNull(fd, "assignee");
 
   const itemResultId = strOrNull(fd, "itemResultId");
   let equipmentId: string;
@@ -883,7 +894,7 @@ export async function createCorrectiveActionAction(fd: FormData): Promise<void> 
     itemLabel,
     title,
     detail: strOrNull(fd, "detail"),
-    assignee: strOrNull(fd, "assignee"),
+    assignee,
     dueDate: strOrNull(fd, "dueDate"),
   });
   revalidatePath("/actions");
@@ -894,15 +905,18 @@ export async function createCorrectiveActionAction(fd: FormData): Promise<void> 
 }
 
 export async function updateCorrectiveActionAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId, userId, userName } = await requireEntitledSession();
   const title = str(fd, "title");
   if (!title) throw new Error("処置のタイトルは必須です");
   const statusRaw = strOrNull(fd, "status");
   const status = statusRaw === "in_progress" ? "in_progress" : "open";
+  // 担当者: role='worker' は送信値を無視して必ず本人名で保存（サーバー側で強制）
+  const role = (await getUserRoleAndFactory(userId))?.role ?? "admin";
+  const assignee = role === "worker" ? userName || null : strOrNull(fd, "assignee");
   await updateCorrectiveAction(companyId, id, {
     title,
     detail: strOrNull(fd, "detail"),
-    assignee: strOrNull(fd, "assignee"),
+    assignee,
     dueDate: strOrNull(fd, "dueDate"),
     status,
   });

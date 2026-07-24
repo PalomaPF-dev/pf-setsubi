@@ -30,7 +30,6 @@ import CustomFieldDefForm from "@/components/CustomFieldDefForm";
 import FactoryMapUploadForm from "@/components/FactoryMapUploadForm";
 import DbErrorState from "@/components/DbErrorState";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
-import WorkerManagement from "@/components/WorkerManagement";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500";
@@ -76,8 +75,7 @@ export default async function SettingsPage() {
       />
 
       <div className="flex flex-col gap-6">
-        {/* 作業者管理（アカウント管理はポータル。ログイン中なら誰でも操作可） */}
-        <WorkerManagement />
+        {/* 作業者管理はポータルのユーザー設定（role='worker'）に移行したため非表示 */}
 
         {/* 以下のマスタ設定（採番・承認・カスタム項目・工場/職場）は管理者のみ */}
         {isAdmin && (

@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
 import { getOptionalSession } from "@/lib/session";
-import { createWorker, deleteWorker, listWorkers } from "@/lib/db";
+import { listWorkers } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-const MAX_NAME_LENGTH = 50;
-
 /**
- * 作業者（アプリ内名簿）API。
- * アカウントはポータルで払い出す共有アカウントのみのため、作業者はアカウントを
- * 持たず名前だけを登録する。ログイン中のアカウントなら誰でも管理できる。
+ * 作業者API。
+ * 作業者はポータルが users.role='worker' として発行するアカウントになったため、
+ * 一覧は users から返す。追加・削除（旧・アプリ内名簿）は廃止（410）。
  */
 
-/** 作業者一覧（会社スコープ）。 */
+/** 作業者一覧（会社スコープ。users の role='worker'）。 */
 export async function GET() {
   const user = await getOptionalSession();
   if (!user) return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 });
@@ -25,50 +23,18 @@ export async function GET() {
   }
 }
 
-/** 作業者を追加。{ name } を受け取る。 */
-export async function POST(req: Request) {
-  const user = await getOptionalSession();
-  if (!user) return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 });
-  try {
-    const body = await req.json().catch(() => ({}));
-    const name = (body.name ?? "").toString().trim();
-    if (!name) {
-      return NextResponse.json({ message: "作業者名を入力してください。" }, { status: 400 });
-    }
-    if (name.length > MAX_NAME_LENGTH) {
-      return NextResponse.json(
-        { message: `作業者名は${MAX_NAME_LENGTH}文字以内で入力してください。` },
-        { status: 400 }
-      );
-    }
-    const worker = await createWorker(user.companyId, name);
-    if (!worker) {
-      return NextResponse.json(
-        { message: "同じ名前の作業者が既に登録されています。" },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ ok: true, worker }, { status: 201 });
-  } catch (err) {
-    console.error("[workers] create error:", err);
-    return NextResponse.json({ message: "追加に失敗しました。" }, { status: 500 });
-  }
+/** （廃止）作業者の追加はポータルで行う。 */
+export async function POST() {
+  return NextResponse.json(
+    { error: "作業者アカウントはポータルのユーザー設定で管理します。" },
+    { status: 410 }
+  );
 }
 
-/** 作業者を削除。{ id } を受け取る。過去の記録の氏名はそのまま残る。 */
-export async function DELETE(req: Request) {
-  const user = await getOptionalSession();
-  if (!user) return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 });
-  try {
-    const body = await req.json().catch(() => ({}));
-    const id = (body.id ?? "").toString().trim();
-    if (!id) {
-      return NextResponse.json({ message: "作業者IDが指定されていません。" }, { status: 400 });
-    }
-    await deleteWorker(user.companyId, id);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[workers] delete error:", err);
-    return NextResponse.json({ message: "削除に失敗しました。" }, { status: 500 });
-  }
+/** （廃止）作業者の削除はポータルで行う。 */
+export async function DELETE() {
+  return NextResponse.json(
+    { error: "作業者アカウントはポータルのユーザー設定で管理します。" },
+    { status: 410 }
+  );
 }

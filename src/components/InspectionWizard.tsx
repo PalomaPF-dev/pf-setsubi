@@ -194,6 +194,7 @@ export default function InspectionWizard({
   diagramUrl,
   workerRoster = [],
   userName,
+  userRole = "member",
 }: {
   assignment: EquipmentProcedure;
   equipmentName: string;
@@ -203,9 +204,11 @@ export default function InspectionWizard({
   referenceMedia?: Record<string, ItemReferenceMedia[]>;
   /** 点検部位マップの図面（各項目の mapX/mapY にピン表示） */
   diagramUrl?: string | null;
-  /** 作業者名簿（点検開始時に選択） */
+  /** 作業者一覧（点検開始時に選択。管理者/一般の代理入力用） */
   workerRoster?: string[];
   userName: string;
+  /** ログイン中ユーザーの役割。worker は記録者名を本人で固定（サーバー側でも強制） */
+  userRole?: "admin" | "member" | "worker";
 }) {
   const storageKey = `insp-draft:${assignment.id}`;
 
@@ -231,6 +234,8 @@ export default function InspectionWizard({
   const [ready, setReady] = useState(false); // 下書きチェック完了後に保存開始
   const [resume, setResume] = useState<DraftData | null>(null);
   // 作業者（点検開始時に選択）。確定するまで点検項目へ進まない。
+  // role='worker' のログインは本人名で固定（選択不可）。
+  const workerLocked = userRole === "worker";
   const [inspectorName, setInspectorName] = useState<string>(userName ?? "");
   const [workerConfirmed, setWorkerConfirmed] = useState(false);
   const [online, setOnline] = useState(true);
@@ -294,8 +299,9 @@ export default function InspectionWizard({
       setAnswers(normalized);
       setIndex(Math.max(0, Math.min(resume.index, items.length)));
       setDraftKey(resume.draftKey);
-      // 旧下書き（作業者フィールドなし）は途中再開なので確定済み扱い
-      setInspectorName(resume.inspectorName ?? userName ?? "");
+      // 旧下書き（作業者フィールドなし）は途中再開なので確定済み扱い。
+      // worker は下書きの値に関わらず本人名で固定する。
+      setInspectorName(workerLocked ? (userName ?? "") : resume.inspectorName ?? userName ?? "");
       setWorkerConfirmed(resume.workerConfirmed ?? true);
     }
     setResume(null);
@@ -467,6 +473,7 @@ export default function InspectionWizard({
         managementNo={managementNo}
         procedureName={assignment.procedureName ?? "点検"}
         roster={workerRoster}
+        locked={workerLocked}
         value={inspectorName}
         onChange={setInspectorName}
         onStart={() => setWorkerConfirmed(true)}
@@ -1307,6 +1314,7 @@ function WorkerSelectScreen({
   managementNo,
   procedureName,
   roster,
+  locked,
   value,
   onChange,
   onStart,
@@ -1315,20 +1323,28 @@ function WorkerSelectScreen({
   managementNo: string;
   procedureName: string;
   roster: string[];
+  /** worker ログイン: 作業者名を本人で固定（選択不可） */
+  locked: boolean;
   value: string;
   onChange: (v: string) => void;
   onStart: () => void;
 }) {
-  // 作業者名簿があれば選択式。名簿に無い値（共有アカウント名など）は未選択として扱う。
+  // 作業者一覧があれば選択式（代理入力）。一覧に無い値（共有アカウント名など）は未選択として扱う。
   const selectValue = roster.includes(value.trim()) ? value.trim() : "";
-  const canStart = roster.length > 0 ? selectValue.length > 0 : value.trim().length > 0;
+  const canStart = locked
+    ? value.trim().length > 0
+    : roster.length > 0
+      ? selectValue.length > 0
+      : value.trim().length > 0;
   return (
     <div className="mx-auto max-w-md p-4 sm:p-6">
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-orange-700">
           <UserRound className="h-6 w-6" />
         </div>
-        <h1 className="text-center text-lg font-bold text-slate-900">作業者を選択</h1>
+        <h1 className="text-center text-lg font-bold text-slate-900">
+          {locked ? "作業者の確認" : "作業者を選択"}
+        </h1>
         <p className="mt-1 text-center text-sm text-slate-500">
           {equipmentName}
           {managementNo && <span className="text-slate-400">（{managementNo}）</span>}
@@ -1336,9 +1352,21 @@ function WorkerSelectScreen({
           <span className="text-xs">{procedureName}</span>
         </p>
 
-        {roster.length > 0 ? (
+        {locked ? (
           <div className="mt-5">
             <label className="mb-1.5 block text-xs font-medium text-slate-500">作業者</label>
+            <div className="flex h-12 w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-base font-medium text-slate-800">
+              {value.trim() || "（不明）"}
+            </div>
+            <p className="mt-1.5 text-xs text-slate-400">
+              作業者アカウントのため、記録者名は本人で固定されます。
+            </p>
+          </div>
+        ) : roster.length > 0 ? (
+          <div className="mt-5">
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">
+              作業者（代理入力可）
+            </label>
             <select
               value={selectValue}
               onChange={(e) => onChange(e.target.value)}
@@ -1352,7 +1380,7 @@ function WorkerSelectScreen({
               ))}
             </select>
             <p className="mt-1.5 text-xs text-slate-400">
-              作業者は設定ページの「作業者管理」で登録できます。
+              作業者アカウントはポータルのユーザー設定で管理します。
             </p>
           </div>
         ) : (

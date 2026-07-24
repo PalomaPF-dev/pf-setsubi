@@ -1,7 +1,8 @@
 /**
  * 作業者名の入力フィールド（Server Component から使用可）。
- * 作業者名簿（workers）が登録されていればセレクト、空なら従来どおりの自由入力。
+ * 作業者アカウント（users の role='worker'）が登録されていればセレクト、空なら従来どおりの自由入力。
  * 保存される値はどちらも氏名の文字列で、データ形状は変わらない。
+ * fixedValue を渡すと本人名で固定表示（worker ログイン用。サーバー側でも強制される）。
  */
 export default function WorkerSelectField({
   name,
@@ -10,6 +11,7 @@ export default function WorkerSelectField({
   placeholder,
   className,
   required = false,
+  fixedValue = null,
 }: {
   name: string;
   workers: string[];
@@ -17,7 +19,11 @@ export default function WorkerSelectField({
   placeholder?: string;
   className?: string;
   required?: boolean;
+  fixedValue?: string | null;
 }) {
+  if (fixedValue) {
+    return <input name={name} value={fixedValue} readOnly className={className} />;
+  }
   if (workers.length === 0) {
     return (
       <input
