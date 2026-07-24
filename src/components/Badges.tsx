@@ -114,12 +114,12 @@ export function ResultBadge({ result }: { result: RecordResult }) {
   );
 }
 
-/** 項目別の判定（OK/NG/判定なし）。 */
+/** 項目別の判定（OK/NG/該当なし/判定なし）。 */
 export function JudgmentBadge({ judgment }: { judgment: Judgment | null }) {
-  if (!judgment) {
+  if (!judgment || judgment === "na") {
     return (
       <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-500/20">
-        —
+        {judgment === "na" ? "該当なし" : "—"}
       </span>
     );
   }

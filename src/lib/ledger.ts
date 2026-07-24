@@ -151,7 +151,13 @@ export function recordCsvCells(
     record.ngCount,
     result.itemLabel,
     ITEM_TYPE_LABEL[result.itemType],
-    result.judgment === "ok" ? "OK" : result.judgment === "ng" ? "NG" : null,
+    result.judgment === "ok"
+      ? "OK"
+      : result.judgment === "ng"
+        ? "NG"
+        : result.judgment === "na"
+          ? "該当なし"
+          : null,
     result.valueNumeric,
     result.unit,
     result.minValue,

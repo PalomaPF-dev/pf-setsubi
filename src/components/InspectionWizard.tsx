@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -9,11 +9,13 @@ import {
   ChevronRight,
   ClipboardCheck,
   History,
+  ImagePlus,
   Loader2,
   MapPin,
   Maximize2,
   MessageSquarePlus,
   Mic,
+  MinusCircle,
   Pencil,
   Play,
   RefreshCw,
@@ -26,6 +28,8 @@ import {
   XCircle,
 } from "lucide-react";
 import PhotoInput from "@/components/PhotoInput";
+import { compressImageFile } from "@/lib/imageCompress";
+import { uploadMedia } from "@/lib/uploadMedia";
 import AudioRecorder from "@/components/AudioRecorder";
 import VideoInput from "@/components/VideoInput";
 import MediaStrip from "@/components/MediaStrip";
@@ -143,21 +147,27 @@ function evalItem(item: InspectionItem, a: AnswerDraft): ItemEval {
     if (!a.judgment) done = false;
     if (a.judgment === "ng" && item.requireCommentOnNg) needsComment = true;
   } else if (item.itemType === "numeric") {
-    numericValue = parseNumeric(a.numericRaw);
-    if (numericValue == null) {
-      done = false;
+    if (a.judgment === "na") {
+      // 該当なし: 測定値なしで完了（号機ごとに仕様が異なり存在しない項目）
+      eff = "na";
     } else {
-      auto = judgeNumeric(numericValue, item.minValue, item.maxValue);
-      eff = auto === "ng" && a.overrideOk ? "ok" : auto;
-      if (auto === "ng" && a.overrideOk) needsComment = true; // 基準外を OK とする理由
-      if (eff === "ng" && item.requireCommentOnNg) needsComment = true;
+      numericValue = parseNumeric(a.numericRaw);
+      if (numericValue == null) {
+        done = false;
+      } else {
+        auto = judgeNumeric(numericValue, item.minValue, item.maxValue);
+        eff = auto === "ng" && a.overrideOk ? "ok" : auto;
+        if (auto === "ng" && a.overrideOk) needsComment = true; // 基準外を OK とする理由
+        if (eff === "ng" && item.requireCommentOnNg) needsComment = true;
+      }
     }
   } else if (item.itemType === "photo") {
     if (!a.photoUrl) done = false;
   }
   // text は任意入力（判定なし）
 
-  if (item.photoMode === "required" && !a.photoUrl) done = false;
+  // 該当なしの項目は写真必須を免除（撮る対象が無い）
+  if (item.photoMode === "required" && !a.photoUrl && eff !== "na") done = false;
   if (needsComment && a.text.trim() === "") done = false;
 
   return { done, effJudgment: eff, autoJudgment: auto, numericValue, needsComment };
@@ -377,9 +387,15 @@ export default function InspectionWizard({
       if (item.itemType === "ok_ng") {
         w.judgment = a.judgment;
       } else if (item.itemType === "numeric") {
-        w.valueNumeric = ev.numericValue;
-        // 上書き時のみ ok を明示。null ならサーバーがしきい値から自動判定する。
-        w.judgment = ev.autoJudgment === "ng" && a.overrideOk ? "ok" : null;
+        if (a.judgment === "na") {
+          // 該当なし: 測定値なし
+          w.judgment = "na";
+          w.valueNumeric = null;
+        } else {
+          w.valueNumeric = ev.numericValue;
+          // 上書き時のみ ok を明示。null ならサーバーがしきい値から自動判定する。
+          w.judgment = ev.autoJudgment === "ng" && a.overrideOk ? "ok" : null;
+        }
       }
       return w;
     });
@@ -686,6 +702,33 @@ function ItemCard({
   const [preview, setPreview] = useState<{ type: MediaType; url: string } | null>(null);
   const mediaFull = a.media.length >= MAX_RESULT_MEDIA_PER_ITEM;
 
+  // 追加写真（どの項目でも複数枚添付できる。1項目で複数箇所を見る場合に使う）
+  const extraPhotoRef = useRef<HTMLInputElement>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  async function onPickExtraPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoError(null);
+    setPhotoUploading(true);
+    try {
+      const compressed = await compressImageFile(file);
+      const { url } = await uploadMedia(compressed, {
+        kind: "result",
+        mediaType: "photo",
+        scopeId: draftKey,
+        fileName: file.name,
+      });
+      addMedia(item.id, { type: "photo", url, durationSec: null });
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "写真のアップロードに失敗しました");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
   // コメント欄（text タイプ以外）: NG・上書き時は自動展開＋必須ラベル
   const commentForced = ev.effJudgment === "ng" || overriding;
   const commentVisible = commentForced || a.commentOpen || a.text.trim() !== "";
@@ -760,53 +803,96 @@ function ItemCard({
       {/* --- タイプ別の入力 --- */}
       <div className="mt-5">
         {item.itemType === "ok_ng" && (
-          <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setAns(item.id, { judgment: "ok" })}
+                className={`inline-flex h-16 items-center justify-center gap-2 rounded-xl text-xl font-bold transition ${
+                  a.judgment === "ok"
+                    ? "bg-emerald-600 text-white ring-2 ring-emerald-400 ring-offset-2"
+                    : "border-2 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                }`}
+              >
+                <CheckCircle2 className="h-7 w-7" />
+                OK
+              </button>
+              <button
+                type="button"
+                onClick={() => setAns(item.id, { judgment: "ng" })}
+                className={`inline-flex h-16 items-center justify-center gap-2 rounded-xl text-xl font-bold transition ${
+                  a.judgment === "ng"
+                    ? "bg-red-600 text-white ring-2 ring-red-400 ring-offset-2"
+                    : "border-2 border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                }`}
+              >
+                <XCircle className="h-7 w-7" />
+                NG
+              </button>
+            </div>
+            {/* 号機ごとに仕様が異なり、この設備には無い項目のための「該当なし」 */}
             <button
               type="button"
-              onClick={() => setAns(item.id, { judgment: "ok" })}
-              className={`inline-flex h-16 items-center justify-center gap-2 rounded-xl text-xl font-bold transition ${
-                a.judgment === "ok"
-                  ? "bg-emerald-600 text-white ring-2 ring-emerald-400 ring-offset-2"
-                  : "border-2 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              onClick={() => setAns(item.id, { judgment: "na" })}
+              className={`mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${
+                a.judgment === "na"
+                  ? "bg-slate-600 text-white ring-2 ring-slate-400 ring-offset-2"
+                  : "border-2 border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
               }`}
             >
-              <CheckCircle2 className="h-7 w-7" />
-              OK
-            </button>
-            <button
-              type="button"
-              onClick={() => setAns(item.id, { judgment: "ng" })}
-              className={`inline-flex h-16 items-center justify-center gap-2 rounded-xl text-xl font-bold transition ${
-                a.judgment === "ng"
-                  ? "bg-red-600 text-white ring-2 ring-red-400 ring-offset-2"
-                  : "border-2 border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-              }`}
-            >
-              <XCircle className="h-7 w-7" />
-              NG
+              <MinusCircle className="h-5 w-5" />
+              該当なし（この設備には無い項目）
             </button>
           </div>
         )}
 
         {item.itemType === "numeric" && (
           <div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                value={a.numericRaw}
-                onChange={(e) =>
-                  setAns(item.id, { numericRaw: e.target.value, overrideOk: false })
-                }
-                placeholder="測定値"
-                className="h-14 w-full rounded-xl border-2 border-slate-300 px-4 text-2xl font-semibold text-slate-900 focus:border-orange-500 focus:outline-none"
-              />
-              {item.unit && (
-                <span className="shrink-0 text-lg font-medium text-slate-500">{item.unit}</span>
-              )}
-            </div>
-            <p className="mt-1.5 text-sm text-slate-500">基準: {rangeLabel(item)}</p>
+            {a.judgment === "na" ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+                  <MinusCircle className="h-4 w-4 shrink-0" />
+                  該当なし（この設備には無い項目）として記録します
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAns(item.id, { judgment: null })}
+                  className="mt-1 text-xs font-medium text-slate-500 underline"
+                >
+                  測定値を入力する
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={a.numericRaw}
+                    onChange={(e) =>
+                      setAns(item.id, { numericRaw: e.target.value, overrideOk: false })
+                    }
+                    placeholder="測定値"
+                    className="h-14 w-full rounded-xl border-2 border-slate-300 px-4 text-2xl font-semibold text-slate-900 focus:border-orange-500 focus:outline-none"
+                  />
+                  {item.unit && (
+                    <span className="shrink-0 text-lg font-medium text-slate-500">{item.unit}</span>
+                  )}
+                </div>
+                <p className="mt-1.5 text-sm text-slate-500">基準: {rangeLabel(item)}</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAns(item.id, { judgment: "na", numericRaw: "", overrideOk: false })
+                  }
+                  className="mt-1.5 inline-flex h-9 items-center gap-1 text-xs font-medium text-slate-500 underline hover:text-slate-700"
+                >
+                  <MinusCircle className="h-3.5 w-3.5" />
+                  該当なし（この設備には無い項目）
+                </button>
+              </>
+            )}
 
             {ev.numericValue != null && ev.autoJudgment === "ok" && (
               <span className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
@@ -871,8 +957,8 @@ function ItemCard({
         )}
       </div>
 
-      {/* --- 共通の写真（photo タイプ以外） --- */}
-      {item.itemType !== "photo" && requiredPhoto && (
+      {/* --- 共通の写真（photo タイプ以外）。該当なしの項目は撮る対象が無いため非表示 --- */}
+      {item.itemType !== "photo" && requiredPhoto && ev.effJudgment !== "na" && (
         <div className="mt-5">
           <label className="mb-1.5 block text-sm font-medium text-slate-700">写真（必須）</label>
           <PhotoInput
@@ -974,6 +1060,28 @@ function ItemCard({
           />
         ) : (
           <div className="flex flex-wrap items-center gap-x-4">
+            {/* 追加写真: どの項目でも複数枚添付できる（1項目で複数箇所を見る場合）。
+                capture を付けず OS のシート（カメラ/ライブラリ）から選ばせる */}
+            <input
+              ref={extraPhotoRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => void onPickExtraPhoto(e)}
+            />
+            <button
+              type="button"
+              disabled={mediaFull || photoUploading}
+              onClick={() => extraPhotoRef.current?.click()}
+              className="inline-flex h-11 items-center gap-1.5 text-sm font-medium text-orange-700 hover:text-orange-800 disabled:opacity-40"
+            >
+              {photoUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImagePlus className="h-4 w-4" />
+              )}
+              写真を追加
+            </button>
             <button
               type="button"
               disabled={mediaFull}
@@ -996,6 +1104,9 @@ function ItemCard({
               <span className="text-xs text-slate-400">
                 メディアは1項目 {MAX_RESULT_MEDIA_PER_ITEM} 件までです
               </span>
+            )}
+            {photoError && (
+              <span className="basis-full text-xs text-red-600">{photoError}</span>
             )}
           </div>
         )}
@@ -1242,6 +1353,10 @@ function ConfirmScreen({
                   ) : ev.effJudgment === "ok" ? (
                     <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
                       OK
+                    </span>
+                  ) : ev.effJudgment === "na" ? (
+                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-500/20">
+                      該当なし
                     </span>
                   ) : ev.done ? (
                     <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-500/20">

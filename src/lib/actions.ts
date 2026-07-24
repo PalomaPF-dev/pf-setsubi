@@ -659,26 +659,33 @@ export async function completeInspectionAction(
     }
 
     if (item.itemType === "ok_ng") {
-      if (a.judgment !== "ok" && a.judgment !== "ng") {
+      // na = 該当なし（号機ごとに仕様が異なり、この設備には無い項目。NG に数えない）
+      if (a.judgment !== "ok" && a.judgment !== "ng" && a.judgment !== "na") {
         return { error: `「${item.label}」の OK/NG を選択してください` };
       }
       judgment = a.judgment;
     } else if (item.itemType === "numeric") {
-      if (a.valueNumeric == null || !Number.isFinite(a.valueNumeric)) {
-        return { error: `「${item.label}」の数値を入力してください` };
-      }
-      valueNumeric = a.valueNumeric;
-      autoJudgment = judgeNumeric(valueNumeric, item.minValue, item.maxValue);
-      judgment = a.judgment === "ok" || a.judgment === "ng" ? a.judgment : autoJudgment;
-      if (judgment !== autoJudgment && !valueText) {
-        return { error: `「${item.label}」は基準値と異なる判定です。理由をコメントに入力してください` };
+      if (a.judgment === "na") {
+        // 該当なし: 測定値なしで記録
+        judgment = "na";
+      } else {
+        if (a.valueNumeric == null || !Number.isFinite(a.valueNumeric)) {
+          return { error: `「${item.label}」の数値を入力してください` };
+        }
+        valueNumeric = a.valueNumeric;
+        autoJudgment = judgeNumeric(valueNumeric, item.minValue, item.maxValue);
+        judgment = a.judgment === "ok" || a.judgment === "ng" ? a.judgment : autoJudgment;
+        if (judgment !== autoJudgment && !valueText) {
+          return { error: `「${item.label}」は基準値と異なる判定です。理由をコメントに入力してください` };
+        }
       }
     } else if (item.itemType === "photo") {
       if (!photoUrl) return { error: `「${item.label}」の写真を撮影してください` };
     }
     // text はコメント欄のみ（判定なし）
 
-    if (item.photoMode === "required" && !photoUrl) {
+    // 該当なしの項目は写真必須を免除（撮る対象が無い）
+    if (item.photoMode === "required" && !photoUrl && judgment !== "na") {
       return { error: `「${item.label}」は写真が必須です` };
     }
     if (item.requireCommentOnNg && judgment === "ng" && !valueText) {
