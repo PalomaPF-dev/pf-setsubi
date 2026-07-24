@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, Wrench, CircleDashed, CheckCircle2, AlertTriangle } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserRoleAndFactory } from "@/lib/authDb";
 import { getFactoryScope, scopedSiteId } from "@/lib/factoryScope";
 import { listCorrectiveActions, listEquipment, listWorkers } from "@/lib/db";
 import {
@@ -45,6 +46,7 @@ export default async function ActionsPage({
 
   let open: CorrectiveAction[], inProgress: CorrectiveAction[], done: CorrectiveAction[], equipment;
   let workerNames: string[] = [];
+  let isWorker = false;
   try {
     // 所属工場による表示制限（制限ユーザーは自工場の処置・設備のみ）
     const scope = await getFactoryScope(session.companyId, session.userId);
@@ -61,6 +63,8 @@ export default async function ActionsPage({
       listEquipment(session.companyId, undefined, { siteId }),
     ]);
     workerNames = (await listWorkers(session.companyId)).map((w) => w.name);
+    // role='worker' は担当者を本人で固定（サーバー側でも強制）
+    isWorker = (await getUserRoleAndFactory(session.userId))?.role === "worker";
   } catch (e) {
     console.error("[actions]", e);
     return (
@@ -162,7 +166,7 @@ export default async function ActionsPage({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {open.map((a) => (
-                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} />
+                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} fixedAssignee={isWorker ? session.userName : null} />
                 ))}
               </ul>
             )}
@@ -180,7 +184,7 @@ export default async function ActionsPage({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {inProgress.map((a) => (
-                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} />
+                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} fixedAssignee={isWorker ? session.userName : null} />
                 ))}
               </ul>
             )}
@@ -208,7 +212,7 @@ export default async function ActionsPage({
             ) : (
               <ul className="divide-y divide-slate-100">
                 {done.map((a) => (
-                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} />
+                  <ActionRow key={a.id} action={a} today={today} workerNames={workerNames} fixedAssignee={isWorker ? session.userName : null} />
                 ))}
               </ul>
             )}
@@ -260,10 +264,13 @@ function ActionRow({
   action: a,
   today,
   workerNames,
+  fixedAssignee,
 }: {
   action: CorrectiveAction;
   today: string;
   workerNames: string[];
+  /** role='worker' 用: 担当者を本人名で固定（サーバー側でも強制される） */
+  fixedAssignee: string | null;
 }) {
   const lv = dueLevel(a.dueDate, today);
   const isDone = a.status === "done";
@@ -322,6 +329,7 @@ function ActionRow({
                     workers={workerNames}
                     defaultValue={a.assignee ?? ""}
                     className={inputCls}
+                    fixedValue={fixedAssignee}
                   />
                 </label>
                 <label className="block">

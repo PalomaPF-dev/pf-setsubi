@@ -131,7 +131,9 @@ export async function POST(req: Request) {
         }
         const name = (u?.name ?? "").toString().trim();
         const email = ((u?.email ?? "").toString().trim().toLowerCase() as string) || null;
-        const role: "admin" | "member" = u?.role === "admin" ? "admin" : "member";
+        // 役割はポータルの3段階（admin=管理者 / worker=作業者 / それ以外は member=一般）
+        const role: "admin" | "member" | "worker" =
+          u?.role === "admin" ? "admin" : u?.role === "worker" ? "worker" : "member";
         // 指名承認者（承認者の login_id）。null/空文字は「指名なし」。
         const approverLoginId: string | null =
           ((u?.approverLoginId ?? "").toString().trim() as string) || null;

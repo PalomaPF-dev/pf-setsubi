@@ -2,6 +2,14 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { getSql } from "./neon";
 
+/**
+ * ユーザーの役割（ポータルの3段階権限）。
+ * - admin: 管理者（マスタ設定・承認・メンバー管理）
+ * - member: 一般（記録＋閲覧。作業者の代理入力可）
+ * - worker: 作業者（本人がログインして記録。記録者名は本人で固定）
+ */
+export type UserRole = "admin" | "member" | "worker";
+
 /** 認証用テーブル（companies/users）を冪等に作成。空DBでも自動初期化されるようにする。 */
 export async function ensureAuthSchema(): Promise<void> {
   const sql = getSql();
@@ -141,7 +149,7 @@ export async function createUser(
   email: string | null,
   name: string,
   password: string,
-  role: "admin" | "member" = "member",
+  role: UserRole = "member",
   loginId: string | null = null
 ): Promise<string> {
   const sql = getSql();
@@ -163,7 +171,7 @@ export async function createInvitedUser(
   loginId: string,
   email: string | null,
   name: string,
-  role: "admin" | "member",
+  role: UserRole,
   factory: string | null = null,
   approverLoginId: string | null = null
 ): Promise<string> {
@@ -185,7 +193,7 @@ export async function listCompanyUsers(companyId: string): Promise<
     loginId: string | null;
     email: string | null;
     name: string;
-    role: "admin" | "member";
+    role: UserRole;
     pending: boolean;
     factory: string | null;
     createdAt: string;
@@ -202,7 +210,7 @@ export async function listCompanyUsers(companyId: string): Promise<
     loginId: (r.login_id as string | null) ?? null,
     email: (r.email as string | null) ?? null,
     name: r.name as string,
-    role: r.role as "admin" | "member",
+    role: r.role as UserRole,
     pending: Boolean(r.pending),
     factory: (r.factory as string | null) ?? null,
     createdAt: r.created_at as string,
@@ -210,11 +218,11 @@ export async function listCompanyUsers(companyId: string): Promise<
 }
 
 /** ユーザーの役割を取得（存在しなければ null）。 */
-export async function getUserRole(userId: string): Promise<"admin" | "member" | null> {
+export async function getUserRole(userId: string): Promise<UserRole | null> {
   const sql = getSql();
   const rows = await sql`SELECT role FROM users WHERE id = ${userId} LIMIT 1`;
   if (rows.length === 0) return null;
-  return rows[0].role as "admin" | "member";
+  return rows[0].role as UserRole;
 }
 
 /**
@@ -223,12 +231,12 @@ export async function getUserRole(userId: string): Promise<"admin" | "member" | 
  */
 export async function getUserRoleAndFactory(
   userId: string
-): Promise<{ role: "admin" | "member"; factory: string | null } | null> {
+): Promise<{ role: UserRole; factory: string | null } | null> {
   const sql = getSql();
   const rows = await sql`SELECT role, factory FROM users WHERE id = ${userId} LIMIT 1`;
   if (rows.length === 0) return null;
   return {
-    role: rows[0].role as "admin" | "member",
+    role: rows[0].role as UserRole,
     factory: (rows[0].factory as string | null) ?? null,
   };
 }
@@ -240,12 +248,12 @@ export async function getUserRoleAndFactory(
  */
 export async function getUserApprovalRouting(
   userId: string
-): Promise<{ role: "admin" | "member"; loginId: string | null } | null> {
+): Promise<{ role: UserRole; loginId: string | null } | null> {
   const sql = getSql();
   const rows = await sql`SELECT role, login_id FROM users WHERE id = ${userId} LIMIT 1`;
   if (rows.length === 0) return null;
   return {
-    role: rows[0].role as "admin" | "member",
+    role: rows[0].role as UserRole,
     loginId: (rows[0].login_id as string | null) ?? null,
   };
 }

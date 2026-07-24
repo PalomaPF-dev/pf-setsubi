@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "./authOptions";
 import { getCompanyEntitlement } from "./entitlement";
-import { getUserRoleAndFactory } from "./authDb";
+import { getUserRoleAndFactory, type UserRole } from "./authDb";
 
 /**
  * ログイン中の会社ID・会社名・ユーザー名を返す。
@@ -64,7 +64,7 @@ export async function requireEntitledSession(): Promise<{
  * 一般ユーザーは role='member' が入るため確実に制限される）。
  * Server Component でマスタ系の出し分け（isAdmin）に使う。
  */
-export async function getSessionRole(): Promise<"admin" | "member"> {
+export async function getSessionRole(): Promise<UserRole> {
   const s = await requireEntitledSession();
   const rf = await getUserRoleAndFactory(s.userId);
   return rf?.role ?? "admin";
@@ -115,7 +115,7 @@ export async function getSessionWithRole(): Promise<{
   userName: string;
   email: string;
   isDemo: boolean;
-  role: "admin" | "member" | null;
+  role: UserRole | null;
   factory: string | null;
 } | null> {
   const session = await getServerSession(authOptions);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Wrench } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
+import { getUserRoleAndFactory } from "@/lib/authDb";
 import { getFactoryScope, isEquipmentSiteVisible, scopedSiteId } from "@/lib/factoryScope";
 import { getEquipment, getItemResultContext, listEquipment, listWorkers } from "@/lib/db";
 import { createCorrectiveActionAction } from "@/lib/actions";
@@ -36,10 +37,13 @@ export default async function NewActionPage({
   let equipment;
   let outOfScope = false;
   let workerNames: string[] = [];
+  let isWorker = false;
   try {
     // 所属工場による表示制限（制限ユーザーは自工場の設備のみ起票対象）
     const scope = await getFactoryScope(session.companyId, session.userId);
     workerNames = (await listWorkers(session.companyId)).map((w) => w.name);
+    // role='worker' は担当者を本人で固定（サーバー側でも強制）
+    isWorker = (await getUserRoleAndFactory(session.userId))?.role === "worker";
     if (itemResultId) {
       ctx = await getItemResultContext(session.companyId, itemResultId);
       if (ctx && scope.restricted) {
@@ -139,6 +143,7 @@ export default async function NewActionPage({
               workers={workerNames}
               placeholder="例: 保全 山田"
               className={inputCls}
+              fixedValue={isWorker ? session.userName : null}
             />
           </label>
           <label className="block">

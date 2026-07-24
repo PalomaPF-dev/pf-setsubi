@@ -1475,7 +1475,8 @@ export async function updateApprovalSettings(
     WHERE id = ${companyId}`;
 }
 
-// ===== 作業者（アプリ内名簿。アカウントとは独立） =====
+// ===== 作業者（users の role='worker'。ポータルで発行される作業者アカウント） =====
+// 旧 workers テーブル（名前だけの名簿）は廃止（データは残置）。読み出し元を users に切り替えた。
 
 export interface Worker {
   id: string;
@@ -1483,40 +1484,19 @@ export interface Worker {
   createdAt: string;
 }
 
-/** 会社の作業者一覧（登録順）。 */
+/** 会社の作業者一覧（users の role='worker'、名前順）。 */
 export async function listWorkers(companyId: string): Promise<Worker[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT id, name, created_at FROM workers
-    WHERE company_id = ${companyId}
-    ORDER BY created_at ASC, name ASC`;
+    SELECT id, name, created_at FROM users
+    WHERE company_id = ${companyId} AND role = 'worker'
+    ORDER BY name ASC`;
   return rows.map((r: any) => ({
     id: r.id as string,
     name: r.name as string,
     createdAt: String(r.created_at),
   }));
-}
-
-/** 作業者を追加。同名が既にあれば null を返す（重複登録しない）。 */
-export async function createWorker(companyId: string, name: string): Promise<Worker | null> {
-  await ensureSchema();
-  const sql = getSql();
-  const rows = await sql`
-    INSERT INTO workers (company_id, name)
-    VALUES (${companyId}, ${name})
-    ON CONFLICT (company_id, name) DO NOTHING
-    RETURNING id, name, created_at`;
-  const r = rows[0];
-  if (!r) return null;
-  return { id: r.id as string, name: r.name as string, createdAt: String(r.created_at) };
-}
-
-/** 作業者を削除（過去の記録の氏名文字列はそのまま残る）。 */
-export async function deleteWorker(companyId: string, id: string): Promise<void> {
-  await ensureSchema();
-  const sql = getSql();
-  await sql`DELETE FROM workers WHERE company_id = ${companyId} AND id = ${id}`;
 }
 
 /** 次の管理番号を採番（seq をアトミックにインクリメント）して文字列で返す。 */
