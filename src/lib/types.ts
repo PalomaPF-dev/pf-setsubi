@@ -49,8 +49,17 @@ export const PHOTO_MODE_LABEL: Record<PhotoMode, string> = {
   required: "必須",
 };
 
-/** 項目判定 */
-export type Judgment = "ok" | "ng";
+/**
+ * 項目判定。
+ * - na: 該当なし（号機ごとに仕様が異なり、その設備には存在しない項目。NG には数えない）
+ */
+export type Judgment = "ok" | "ng" | "na";
+
+export const JUDGMENT_LABEL: Record<Judgment, string> = {
+  ok: "OK",
+  ng: "NG",
+  na: "該当なし",
+};
 
 /** 点検記録の総合結果 */
 export type RecordResult = "pass" | "fail";

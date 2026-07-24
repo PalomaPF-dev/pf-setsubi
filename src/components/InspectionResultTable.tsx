@@ -74,7 +74,13 @@ export default function InspectionResultTable({
             <td className="px-3 py-2">
               {printMode ? (
                 <span className={r.judgment === "ng" ? "font-bold" : ""}>
-                  {r.judgment === "ok" ? "OK" : r.judgment === "ng" ? "NG" : "—"}
+                  {r.judgment === "ok"
+                    ? "OK"
+                    : r.judgment === "ng"
+                      ? "NG"
+                      : r.judgment === "na"
+                        ? "該当なし"
+                        : "—"}
                 </span>
               ) : (
                 <JudgmentBadge judgment={r.judgment} />

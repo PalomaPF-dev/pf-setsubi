@@ -10,6 +10,7 @@ import {
   CalendarClock,
   ClipboardList,
   History,
+  Home,
   QrCode,
   Menu,
   X,
@@ -88,15 +89,16 @@ function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin: b
   );
 }
 
-function Brand() {
+function Brand({ onNavigate }: { onNavigate?: () => void }) {
+  // ロゴはどこからでもホーム（ダッシュボード）へ戻れる導線
   return (
-    <div className="flex items-center gap-2.5 px-5 py-4">
+    <Link href="/" onClick={onNavigate} className="flex items-center gap-2.5 px-5 py-4">
       <img src="/icon-192.png" alt="" className="h-9 w-9 rounded-[9px]" />
       <div className="leading-tight">
         <div className="whitespace-nowrap text-sm font-bold text-[#333333]">PF設備管理</div>
         <div className="text-[10px] text-[#707070]">設備管理・点検</div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -153,7 +155,7 @@ export default function AppShell({ children, isAdmin = false }: { children: Reac
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
           <aside className="absolute left-0 top-0 flex h-full w-64 flex-col bg-white shadow-xl">
             <div className="flex items-center justify-between pr-2">
-              <Brand />
+              <Brand onNavigate={() => setDrawerOpen(false)} />
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="rounded p-2 text-slate-500 hover:bg-slate-100"
@@ -180,13 +182,21 @@ export default function AppShell({ children, isAdmin = false }: { children: Reac
           >
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex min-w-0 items-center gap-2">
+          <Link href="/" className="flex min-w-0 items-center gap-2">
             <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
             <span className="truncate whitespace-nowrap text-sm font-bold text-[#333333]">PF設備管理</span>
-          </div>
+          </Link>
           {/* 管理者向け: 承認待ちバッジ（モバイルは省スペース表記） */}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
             <ApprovalNoticeBadge compact />
+            {/* どの画面からでもワンタップでホームへ戻れる常設ボタン */}
+            <Link
+              href="/"
+              aria-label="ホームへ戻る"
+              className="rounded p-2 text-[#555555] hover:bg-[#f7f7f5]"
+            >
+              <Home className="h-6 w-6" />
+            </Link>
           </div>
         </header>
         <main className="print-main flex-1 overflow-y-auto">{children}</main>
