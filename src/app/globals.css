@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* 共通UIパッケージ（@paloma-pf/ui）内のクラスも Tailwind の検出対象にする */
+@source "../../node_modules/@paloma-pf/ui/src";
+
 /* サイドバーを常時表示する条件：幅が広く かつ 高さも十分（=タブレット/PC）。
    横向きスマホ（高さが低い）は対象外＝ドロワー（☰）に自動で隠す。 */
 @custom-variant wide (@media (min-width: 768px) and (min-height: 600px));
