@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 // オンプレ Docker ビルド時のみ BUILD_STANDALONE=1 で standalone 出力（クラウドビルドには影響しない）。
 const nextConfig: NextConfig = {
   ...(process.env.BUILD_STANDALONE === "1" ? { output: "standalone" as const } : {}),
+  // 共通UIパッケージは TSX をそのまま配布しているためトランスパイルする
+  transpilePackages: ["@paloma-pf/ui"],
   turbopack: {
     root: __dirname,
   },
