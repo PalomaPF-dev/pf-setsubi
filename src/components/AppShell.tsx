@@ -9,6 +9,7 @@ import {
   History,
   QrCode,
   LogOut,
+  Mail,
   Settings,
   Wrench,
   BookOpen,
@@ -40,6 +41,16 @@ function UserFooter() {
         <span className="mx-1 text-slate-300">/</span>
         {session.user.name}
       </div>
+      {/* ポータルのお問い合わせフォーム（このアプリを選択した状態で開く） */}
+      <a
+        href="https://portal.paloma-pf.com/?contact=setsubi"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-medium text-[#555555] hover:bg-[#f7f7f5]"
+      >
+        <Mail className="h-4 w-4" />
+        お問い合わせ
+      </a>
       <button
         onClick={() => {
           void signOut({ redirect: false }).then(() => {
