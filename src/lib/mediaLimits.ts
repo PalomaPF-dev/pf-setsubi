@@ -12,6 +12,16 @@ export const AUDIO_MAX_SECONDS = 60;
 export const MAX_RESULT_MEDIA_PER_ITEM = 5; // 点検記録の項目あたり
 export const MAX_REFERENCE_MEDIA_PER_ITEM = 10; // 正常見本の項目あたり
 
+/**
+ * アップロード前の動画再エンコード設定（videoCompress.ts）。
+ * スマホ撮影の 1080p/10Mbps 超をこの水準まで落として送る＝転送量おおむね 1/5〜1/10。
+ * 現場で漏れ・部品の状態が判別できる画質は保つ値にしている。
+ */
+export const VIDEO_TARGET_MAX_EDGE = 960; // 長辺 px
+export const VIDEO_TARGET_BITRATE = 2_000_000; // 映像 bps
+export const VIDEO_TARGET_AUDIO_BITRATE = 64_000; // 音声 bps（異音の確認用に残す）
+export const VIDEO_TARGET_FPS = 24;
+
 export const ALLOWED_MEDIA_CONTENT_TYPES: Record<"photo" | "audio" | "video" | "image", string[]> = {
   photo: ["image/jpeg", "image/png", "image/webp"],
   image: ["image/jpeg", "image/png", "image/webp"], // マップ・箇所写真用(photo と同一)

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Video, Film, Loader2, RotateCcw, Check } from "lucide-react";
 import { uploadMedia } from "@/lib/uploadMedia";
+import { compressVideoFile } from "@/lib/videoCompress";
 import {
   MEDIA_MAX_BYTES,
   VIDEO_MAX_SECONDS,
@@ -17,7 +18,7 @@ export interface VideoInputResult {
   contentType?: string;
 }
 
-type VState = "idle" | "checking" | "preview" | "uploading" | "done" | "error";
+type VState = "idle" | "checking" | "preview" | "compressing" | "uploading" | "done" | "error";
 
 const MAX_MB = Math.round(MEDIA_MAX_BYTES / 1024 / 1024);
 
@@ -123,12 +124,18 @@ export default function VideoInput({
   }
 
   async function upload() {
-    const file = fileRef.current;
-    if (!file) return;
+    const original = fileRef.current;
+    if (!original) return;
     setError(null);
     setProgress(0);
-    setState("uploading");
     try {
+      // 電波の弱い現場での待ち時間を減らすため、送る前に再エンコードして軽くする。
+      // 失敗しても compressVideoFile が元ファイルを返すのでアップロードは止まらない。
+      setState("compressing");
+      const file = await compressVideoFile(original, setProgress);
+
+      setProgress(0);
+      setState("uploading");
       const { url } = await uploadMedia(file, {
         kind,
         mediaType: "video",
@@ -246,6 +253,24 @@ export default function VideoInput({
         </div>
       )}
 
+      {state === "compressing" && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            動画を軽くしています… {progress}%
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-orange-600 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-400">
+            通信量を減らすため送信前に圧縮しています（動画の長さと同じくらいかかります）
+          </p>
+        </div>
+      )}
+
       {state === "uploading" && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -292,7 +317,7 @@ export default function VideoInput({
       )}
 
       <p className="mt-2 text-xs text-slate-400">
-        動画は{VIDEO_MAX_SECONDS}秒・{MAX_MB}MBまで
+        動画は{VIDEO_MAX_SECONDS}秒・{MAX_MB}MBまで（送信前に自動で圧縮します）
       </p>
     </div>
   );
