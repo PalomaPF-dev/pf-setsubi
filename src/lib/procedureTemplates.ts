@@ -16,6 +16,11 @@ export interface ProcedureTemplateItem {
   max?: number; // 以下で OK
   photoMode?: PhotoMode; // 省略時 "none"。photo タイプはサーバー側で required に正規化
   requireCommentOnNg?: boolean;
+  /**
+   * 点検箇所の見本写真（どの計器を見るか）。public/ 配下に同梱した静的アセットの絶対パス。
+   * アップロード物ではないので削除対象外（actions.ts の deleteBlobs でフィルタ）。
+   */
+  spotPhotoUrl?: string;
 }
 
 export interface ProcedureTemplate {
@@ -224,19 +229,44 @@ export const PROCEDURE_TEMPLATES: ProcedureTemplate[] = [
     key: "oxynon-daily",
     name: "オキシノン炉 日常点検",
     description:
-      "関東冶金工業 オキシノン炉の日常点検（整理番号 D1N-063-A / 帳票 J-210）。判定は良好=○（OK）／不具合=×（NG）、数値項目は測定値を記入。各項目は設備使用前に実施する。",
+      "関東冶金工業 オキシノン炉の日常，週 設備点検チェックシート（整理番号 D1N-063-A / 職場 大口 内同 / 帳票 J-210(4)）。判定は良好=○（OK）／不具合=×（NG）。安全・駆動部の項目は設備使用前に実施し、「条件」の数値項目（※）は運転中に実測値を記入する。不具合がある場合は直ちに責任者へ連絡し、処置が済むまで使用しない。主要な計器には点検箇所の見本写真を添付。",
     category: "熱処理炉",
     recommendedInterval: "毎日（始業前）",
     items: [
+      // ===== 安全・駆動部（設備使用前に実施） =====
       { label: "非常停止ボタンを押して運転準備が落ちるか", itemType: "ok_ng", instruction: "安全。非常停止ボタンで運転準備が確実に落ちること。", requireCommentOnNg: true },
       { label: "安全カバーが確実に取付され破損がないか", itemType: "ok_ng", instruction: "安全。取付状態と破損を目視確認。" },
       { label: "設備内に不要な物が無いか", itemType: "ok_ng", instruction: "安全。設備内の異物・不要物を確認。" },
       { label: "コンベア動作中に異音が無いか", itemType: "ok_ng", instruction: "駆動部。動作中の異音を確認。" },
-      { label: "アルゴンガス使用量（雰囲気ガス増量弁が「開」）", itemType: "numeric", instruction: "安全。増量弁が「開」で 30〜50m³/h。測定値を記入。", unit: "m³/h", min: 30, max: 50 },
-      { label: "O2濃度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。O2濃度アラートが発生していないこと。", requireCommentOnNg: true },
-      { label: "CO濃度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。CO濃度アラートが発生していないこと。", requireCommentOnNg: true },
-      { label: "炉内圧力：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。炉内圧力アラートが発生していないこと。", requireCommentOnNg: true },
-      { label: "炉内温度・乾燥炉温度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。炉内温度・乾燥炉温度アラートが発生していないこと。", requireCommentOnNg: true },
+      { label: "アルゴンガス使用量（雰囲気ガス増量弁が「開」）", itemType: "numeric", instruction: "安全。増量弁が「開」で 30〜50m³/h。測定値を記入。", unit: "m³/h", min: 30, max: 50, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "O2濃度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。O2濃度アラートが発生していないこと。", requireCommentOnNg: true, spotPhotoUrl: "/templates/oxynon/o2-meter.png" },
+      { label: "CO濃度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。CO濃度アラートが発生していないこと。", requireCommentOnNg: true, spotPhotoUrl: "/templates/oxynon/co-meter.png" },
+      { label: "炉内圧力：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。炉内圧力アラートが発生していないこと。", requireCommentOnNg: true, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "炉内温度・乾燥炉温度：アラートの発生が無いか", itemType: "ok_ng", instruction: "安全。炉内温度・乾燥炉温度アラートが発生していないこと。", requireCommentOnNg: true, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+
+      // ===== 条件 ※数値記入（運転中に実測値を記入） =====
+      { label: "CO濃度", itemType: "numeric", instruction: "条件（※数値記入）。CO濃度計の表示値を記入。規格 1ppm以下。", unit: "ppm", max: 1, spotPhotoUrl: "/templates/oxynon/co-meter.png" },
+      { label: "酸素濃度", itemType: "numeric", instruction: "条件（※数値記入）。酸素濃度計の表示値を記入。規格 200ppm以下。", unit: "ppm", max: 200, spotPhotoUrl: "/templates/oxynon/o2-meter.png" },
+      { label: "コンベアスピード", itemType: "numeric", instruction: "条件（※数値記入）。操作盤の表示値を記入。規格 220〜240mm/min。", unit: "mm/min", min: 220, max: 240, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "循環水温度", itemType: "numeric", instruction: "条件（※数値記入）。規格 35℃以下。", unit: "℃", max: 35, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "循環水圧力", itemType: "numeric", instruction: "条件（※数値記入）。圧力計の指示値を記入。規格 1.0MPa±0.1MPa。", unit: "MPa", min: 0.9, max: 1.1, spotPhotoUrl: "/templates/oxynon/water-pressure-gauge.png" },
+      { label: "乾燥炉温度①", itemType: "numeric", instruction: "条件（※数値記入）。規格 200℃±10℃。", unit: "℃", min: 190, max: 210, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "乾燥炉温度②", itemType: "numeric", instruction: "条件（※数値記入）。規格 230℃±10℃。", unit: "℃", min: 220, max: 240, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "脱バインダー温度①", itemType: "numeric", instruction: "条件（※数値記入）。規格 200℃±10℃。", unit: "℃", min: 190, max: 210, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "脱バインダー温度②", itemType: "numeric", instruction: "条件（※数値記入）。規格 500℃±10℃。", unit: "℃", min: 490, max: 510, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "脱バインダー温度③", itemType: "numeric", instruction: "条件（※数値記入）。規格 500℃±10℃。", unit: "℃", min: 490, max: 510, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "加熱炉①", itemType: "numeric", instruction: "条件（※数値記入）。規格 950℃±10℃。", unit: "℃", min: 940, max: 960, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "加熱炉②", itemType: "numeric", instruction: "条件（※数値記入）。規格 1050℃±10℃。", unit: "℃", min: 1040, max: 1060, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "加熱炉③", itemType: "numeric", instruction: "条件（※数値記入）。規格 1090℃±10℃。", unit: "℃", min: 1080, max: 1100, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "加熱炉④", itemType: "numeric", instruction: "条件（※数値記入）。規格 1090℃±10℃。", unit: "℃", min: 1080, max: 1100, spotPhotoUrl: "/templates/oxynon/control-panel.png" },
+      { label: "アルゴンガス流量 入口内扉", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 10.5±0.1㎥/h。", unit: "㎥/h", min: 10.4, max: 10.6, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "アルゴンガス流量 前室", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 5.5±0.1㎥/h。", unit: "㎥/h", min: 5.4, max: 5.6, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "アルゴンガス流量 中間室", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 3.0±0.1㎥/h。", unit: "㎥/h", min: 2.9, max: 3.1, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "アルゴンガス流量 端子箱（RH）", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 1.0±0.1㎥/h。", unit: "㎥/h", min: 0.9, max: 1.1, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "アルゴンガス流量 端子箱（LH）", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 1.0±0.1㎥/h。", unit: "㎥/h", min: 0.9, max: 1.1, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "アルゴンガス流量 冷却室", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 5.0±0.1㎥/h。", unit: "㎥/h", min: 4.9, max: 5.1, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "アルゴンガス流量 後ろ室", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 5.0±0.1㎥/h。", unit: "㎥/h", min: 4.9, max: 5.1, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
+      { label: "アルゴンガス流量 出口内扉", itemType: "numeric", instruction: "条件（※数値記入）。流量計の指示値を記入。規格 5.0±0.1㎥/h。", unit: "㎥/h", min: 4.9, max: 5.1, spotPhotoUrl: "/templates/oxynon/argon-flowmeter.png" },
     ],
   },
   {
