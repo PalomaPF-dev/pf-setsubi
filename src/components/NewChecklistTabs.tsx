@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FileUp } from "lucide-react";
+import { FileUp, Camera } from "lucide-react";
 import { createProcedureAction, createProcedureFromTemplateAction } from "@/lib/actions";
 import { PROCEDURE_TEMPLATES, type ProcedureTemplateItem } from "@/lib/procedureTemplates";
 import SubmitButton from "@/components/SubmitButton";
@@ -95,7 +95,9 @@ export default function NewChecklistTabs() {
         </form>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {PROCEDURE_TEMPLATES.map((tpl) => (
+          {PROCEDURE_TEMPLATES.map((tpl) => {
+            const photoCount = tpl.items.filter((it) => it.spotPhotoUrl).length;
+            return (
             <div
               key={tpl.key}
               className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4"
@@ -104,7 +106,15 @@ export default function NewChecklistTabs() {
                 <span className="rounded-md bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">
                   {tpl.category}
                 </span>
-                <span className="text-xs text-slate-400">{tpl.recommendedInterval}</span>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  {photoCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-slate-500">
+                      <Camera className="h-3.5 w-3.5" />
+                      写真 {photoCount}
+                    </span>
+                  )}
+                  <span>{tpl.recommendedInterval}</span>
+                </div>
               </div>
               <h3 className="mt-2 font-semibold text-slate-800">{tpl.name}</h3>
               <p className="mt-1 text-xs text-slate-500">{tpl.description}</p>
@@ -122,6 +132,9 @@ export default function NewChecklistTabs() {
                         </span>
                         {item.label}
                         {range && <span className="ml-1 text-[10px] text-slate-400">{range}</span>}
+                        {item.spotPhotoUrl && (
+                          <Camera className="ml-1 inline h-3 w-3 align-text-top text-slate-400" />
+                        )}
                       </li>
                     );
                   })}
@@ -133,7 +146,8 @@ export default function NewChecklistTabs() {
                 </SubmitButton>
               </form>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

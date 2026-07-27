@@ -119,8 +119,10 @@ function floatOrNull(fd: FormData, key: string): number | null {
 
 /** DB から行を消した後にストレージ側も削除（失敗しても業務データは消えているので握り潰してログのみ）。 */
 async function deleteBlobs(urls: string[]): Promise<void> {
-  if (urls.length === 0) return;
-  await getStorage().deleteFiles(urls);
+  // アップロード物のみ削除対象。テンプレート同梱の静的写真（/templates/...）は残す。
+  const uploaded = urls.filter((u) => u.startsWith("/api/files/") || u.startsWith("https://"));
+  if (uploaded.length === 0) return;
+  await getStorage().deleteFiles(uploaded);
 }
 
 /** フォームの cf_<defId> 入力からカスタム値マップを組み立てる（空値は保存しない）。 */

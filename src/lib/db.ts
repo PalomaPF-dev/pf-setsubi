@@ -1985,14 +1985,15 @@ export async function createProcedureFromTemplate(
       return sql`
         INSERT INTO inspection_items (
           company_id, procedure_id, sort_order, label, item_type, instruction,
-          unit, min_value, max_value, photo_mode, require_comment_on_ng
+          unit, min_value, max_value, photo_mode, require_comment_on_ng, spot_photo_url
         ) VALUES (
           ${companyId}, ${procedureId}, ${i}, ${it.label}, ${it.itemType},
           ${it.instruction ?? null},
           ${numeric ? it.unit ?? null : null},
           ${numeric ? it.min ?? null : null},
           ${numeric ? it.max ?? null : null},
-          ${photoMode}, ${it.requireCommentOnNg ?? false}
+          ${photoMode}, ${it.requireCommentOnNg ?? false},
+          ${it.spotPhotoUrl ?? null}
         )`;
     }),
   ]);
