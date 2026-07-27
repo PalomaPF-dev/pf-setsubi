@@ -80,7 +80,7 @@ export default function AppShell({
   return (
     <BaseAppShell
       nav={NAV}
-      brand={{ title: "PF設備管理", subtitle: "設備管理・点検" }}
+      brand={{ eyebrow: "株式会社パロマ", title: "PF設備管理", subtitle: "設備管理・点検" }}
       isAdmin={isAdmin}
       // 管理者向け: 自分宛ての承認待ちがあれば常時表示（全ページ共通）
       sidebarTop={<ApprovalNoticeBadge />}
