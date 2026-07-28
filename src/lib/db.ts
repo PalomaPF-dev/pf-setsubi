@@ -555,11 +555,15 @@ export async function deleteDocument(companyId: string, id: string): Promise<voi
 /** 手順書一覧（項目数・割当設備数・記録数付き）。既定ではアーカイブ済みを除く。 */
 export async function listProcedures(
   companyId: string,
-  opts?: { includeArchived?: boolean }
+  opts?: { includeArchived?: boolean; search?: string }
 ): Promise<InspectionProcedure[]> {
   await ensureSchema();
   const sql = getSql();
   const includeArchived = opts?.includeArchived ?? false;
+  // 手順書名・説明のほか、点検項目名でも引けるようにする（「圧力」で該当手順書を探す等）。
+  // LIKE のワイルドカード（% _ \）は打ち消して、入力文字そのものを探す。
+  const term = opts?.search?.trim();
+  const like = term ? `%${term.replace(/[\\%_]/g, "\\$&")}%` : null;
   const rows = await sql`
     SELECT p.*,
       (SELECT COUNT(*) FROM inspection_items i
@@ -568,6 +572,12 @@ export async function listProcedures(
       (SELECT COUNT(*) FROM inspection_records r WHERE r.procedure_id = p.id) AS record_count
     FROM inspection_procedures p
     WHERE p.company_id = ${companyId} AND (${includeArchived} OR p.archived = false)
+      AND (${like}::text IS NULL
+           OR p.name ILIKE ${like}
+           OR p.description ILIKE ${like}
+           OR EXISTS (SELECT 1 FROM inspection_items i
+                      WHERE i.procedure_id = p.id AND i.archived = false
+                        AND i.label ILIKE ${like}))
     ORDER BY p.archived ASC, p.created_at DESC`;
   return rows.map(mapProcedure);
 }
