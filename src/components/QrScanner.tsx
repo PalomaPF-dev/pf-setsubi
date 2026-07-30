@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CameraOff, RefreshCw } from "lucide-react";
+import { CameraOff, RefreshCw, ScanLine } from "lucide-react";
+import { useScanWedge } from "@paloma-pf/ui";
 
 const REGION_ID = "qr-reader-region";
 
@@ -16,6 +17,44 @@ export default function QrScanner() {
   const [status, setStatus] = useState<"idle" | "scanning" | "error">("idle");
   const [message, setMessage] = useState("");
   const [scanKey, setScanKey] = useState(0);
+
+  /** カメラ・ハンディの区別なく、読み取れたコードを設備詳細／台帳検索へ解決する。 */
+  const handleDecoded = useCallback(
+    (text: string) => {
+      // 自アプリのURLなら /equipment/<id> へ。それ以外は検索語として扱う。
+      let target = "";
+      try {
+        const u = new URL(text);
+        const m = u.pathname.match(/\/equipment\/([0-9a-fA-F-]{8,})/);
+        if (m) target = `/equipment/${m[1]}`;
+      } catch {
+        /* URL でない */
+      }
+      if (!target) {
+        const m = text.match(/\/equipment\/([0-9a-fA-F-]{8,})/);
+        target = m ? `/equipment/${m[1]}` : `/equipment?q=${encodeURIComponent(text.trim())}`;
+      }
+      const inst = scannerRef.current;
+      scannerRef.current = null;
+      Promise.resolve()
+        .then(() => inst?.stop())
+        .catch(() => {
+          /* 停止済みなどは無視 */
+        })
+        .then(() => {
+          try {
+            inst?.clear();
+          } catch {
+            /* noop */
+          }
+          router.push(target);
+        });
+    },
+    [router]
+  );
+
+  // ハンディターミナル（DataWedge のキーストローク出力）で読み取った場合もここに入る
+  useScanWedge({ onScan: handleDecoded });
 
   useEffect(() => {
     let active = true;
@@ -53,33 +92,6 @@ export default function QrScanner() {
       }
     })();
 
-    function handleDecoded(text: string) {
-      // 自アプリのURLなら /equipment/<id> へ。それ以外は検索語として扱う。
-      let target = "";
-      try {
-        const u = new URL(text);
-        const m = u.pathname.match(/\/equipment\/([0-9a-fA-F-]{8,})/);
-        if (m) target = `/equipment/${m[1]}`;
-      } catch {
-        /* URL でない */
-      }
-      if (!target) {
-        const m = text.match(/\/equipment\/([0-9a-fA-F-]{8,})/);
-        target = m ? `/equipment/${m[1]}` : `/equipment?q=${encodeURIComponent(text.trim())}`;
-      }
-      stopAndGo(target);
-    }
-
-    async function stopAndGo(target: string) {
-      try {
-        await instance?.stop();
-        instance?.clear();
-      } catch {
-        /* noop */
-      }
-      router.push(target);
-    }
-
     return () => {
       active = false;
       (async () => {
@@ -91,7 +103,7 @@ export default function QrScanner() {
         }
       })();
     };
-  }, [router, scanKey]);
+  }, [handleDecoded, scanKey]);
 
   return (
     <div>
@@ -112,6 +124,12 @@ export default function QrScanner() {
       {status === "scanning" && (
         <p className="mt-3 text-center text-sm text-slate-500">カメラにQRコードをかざしてください…</p>
       )}
+
+      {/* ハンディターミナルはカメラを使わず、トリガーを引くだけで読み取れる */}
+      <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
+        <ScanLine className="h-3.5 w-3.5" />
+        ハンディターミナルはトリガーを引いて読み取れます
+      </p>
 
       {status === "error" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">

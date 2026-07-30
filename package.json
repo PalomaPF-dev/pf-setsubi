@@ -18,7 +18,7 @@
     "@capacitor/network": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@neondatabase/serverless": "^1.1.0",
-    "@paloma-pf/ui": "github:PalomaPF-dev/pf-ui#68e3ef668db99903204c2fccf3824cc0270b36f8",
+    "@paloma-pf/ui": "github:PalomaPF-dev/pf-ui#a95161d2da78ab4d0ecb2d2084cf5a6806b3be0d",
     "@vercel/blob": "^0.27.0",
     "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
