@@ -1,9 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import AppShell from "@/components/AppShell";
 import { getOptionalSession } from "@/lib/session";
 import { getUserRoleAndFactory } from "@/lib/authDb";
+
+/**
+ * 本文フォント。OS標準任せだと Mac=ヒラギノ / Windows=メイリオ で見え方が変わるため、
+ * PFシリーズ共通のフォントを配信して両OSで同じ表示にする（ポータルと同じ Noto Sans JP）。
+ * next/font はビルド時にフォントを取り込んで自前配信するので、実行時の外部リクエストは無い。
+ */
+const notoSansJP = Noto_Sans_JP({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
   title: "PF設備管理",
@@ -34,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     isAdmin = false;
   }
   return (
-    <html lang="ja">
+    <html lang="ja" className={notoSansJP.variable}>
       <body className="antialiased">
         <Providers>
           <AppShell isAdmin={isAdmin}>{children}</AppShell>
