@@ -5,8 +5,6 @@ import {
   AlertTriangle,
   Camera,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   ClipboardCheck,
   History,
   ImagePlus,
@@ -191,7 +189,8 @@ function genDraftKey(): string {
 // ===== 本体 =====
 
 /**
- * 点検実施ウィザード（1画面=1項目）。
+ * 点検実施フォーム（全項目を1ページに並べて入力）。
+ * 品質チェックシートと同じく、項目を縦に並べて上から入力する（画面遷移の手数を減らす）。
  * 入力のたび localStorage に下書き保存し、中断しても再開できる。
  * 完了時は completeInspectionAction がサーバーで再検証・スナップショット保存する。
  */
@@ -239,7 +238,8 @@ export default function InspectionWizard({
   );
 
   const [answers, setAnswers] = useState<Record<string, AnswerDraft>>({});
-  const [index, setIndex] = useState(0); // items.length = 最終確認画面
+  /** 項目カードの DOM 参照（未入力バッジ・進捗ドットからのスクロール先） */
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [draftKey, setDraftKey] = useState<string>(() => genDraftKey());
   const [ready, setReady] = useState(false); // 下書きチェック完了後に保存開始
   const [resume, setResume] = useState<DraftData | null>(null);
@@ -275,14 +275,15 @@ export default function InspectionWizard({
   useEffect(() => {
     if (!ready) return;
     try {
+      // index は旧バージョン（1項目ずつ表示）の下書きとの互換のため 0 を書き続ける
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ answers, index, draftKey, inspectorName, workerConfirmed })
+        JSON.stringify({ answers, index: 0, draftKey, inspectorName, workerConfirmed })
       );
     } catch {
       /* 容量超過などは無視（アプリ動作は継続） */
     }
-  }, [ready, answers, index, draftKey, inspectorName, workerConfirmed, storageKey]);
+  }, [ready, answers, draftKey, inspectorName, workerConfirmed, storageKey]);
 
   // オンライン監視
   useEffect(() => {
@@ -307,7 +308,7 @@ export default function InspectionWizard({
         normalized[k] = merged;
       }
       setAnswers(normalized);
-      setIndex(Math.max(0, Math.min(resume.index, items.length)));
+      // resume.index は旧バージョンの表示位置。1ページ入力では使わない（回答だけ復元する）
       setDraftKey(resume.draftKey);
       // 旧下書き（作業者フィールドなし）は途中再開なので確定済み扱い。
       // worker は下書きの値に関わらず本人名で固定する。
@@ -364,9 +365,12 @@ export default function InspectionWizard({
   const incomplete = items
     .map((it, i) => ({ it, i }))
     .filter(({ i }) => !evals[i].done);
-  const isConfirm = index >= items.length;
-  const current = isConfirm ? null : items[index];
-  const currentEval = isConfirm ? null : evals[index];
+  /** 未入力バッジ・進捗ドットから該当項目へスクロールする（1ページ入力なので画面遷移はしない）。 */
+  function scrollToItem(i: number) {
+    const it = items[i];
+    if (!it) return;
+    itemRefs.current[it.id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   function buildPayload(): CompleteInspectionPayload {
     const wizardAnswers: WizardAnswer[] = items.map((item, i) => {
@@ -534,20 +538,15 @@ export default function InspectionWizard({
                   : ev.done
                     ? "bg-orange-600"
                     : "bg-slate-300";
-              const isCurrent = i === index;
               return (
                 <button
                   key={it.id}
                   type="button"
-                  onClick={() => setIndex(i)}
+                  onClick={() => scrollToItem(i)}
                   aria-label={`項目 ${i + 1}: ${it.label}`}
                   className="flex h-7 w-7 items-center justify-center"
                 >
-                  <span
-                    className={`h-3 w-3 rounded-full transition ${color} ${
-                      isCurrent ? "ring-2 ring-orange-400 ring-offset-2" : ""
-                    }`}
-                  />
+                  <span className={`h-3 w-3 rounded-full transition ${color}`} />
                 </button>
               );
             })}
@@ -562,32 +561,45 @@ export default function InspectionWizard({
         )}
       </div>
 
-      {/* ===== 本文 ===== */}
+      {/* ===== 本文：全項目を1ページに並べて入力 ===== */}
       <div className="mx-auto w-full max-w-lg flex-1 px-4 py-5">
-        {current && currentEval ? (
-          <ItemCard
-            key={current.id}
-            item={current}
-            index={index}
-            total={items.length}
-            answer={getAns(current.id)}
-            ev={currentEval}
-            draftKey={draftKey}
-            refMedia={referenceMedia?.[current.id] ?? []}
-            diagramUrl={diagramUrl ?? null}
-            diagramPins={diagramPins}
-            setAns={setAns}
-            addMedia={addMedia}
-            removeMedia={removeMedia}
-          />
-        ) : (
+        <div className="flex flex-col gap-4">
+          {items.map((it, i) => (
+            <div
+              key={it.id}
+              ref={(el) => {
+                itemRefs.current[it.id] = el;
+              }}
+              // 固定ヘッダーに隠れないようスクロール位置をずらす
+              className="scroll-mt-32"
+            >
+              <ItemCard
+                item={it}
+                index={i}
+                total={items.length}
+                answer={getAns(it.id)}
+                ev={evals[i]}
+                draftKey={draftKey}
+                refMedia={referenceMedia?.[it.id] ?? []}
+                diagramUrl={diagramUrl ?? null}
+                diagramPins={diagramPins}
+                setAns={setAns}
+                addMedia={addMedia}
+                removeMedia={removeMedia}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* 送付前の入力（点検日・記録者・備考）。項目の判定一覧は上の入力欄そのものなので省く */}
+        <div className="mt-6">
           <ConfirmScreen
             items={items}
             evals={evals}
             getAns={getAns}
             ngCount={ngCount}
             incomplete={incomplete}
-            jumpTo={setIndex}
+            jumpTo={scrollToItem}
             inspectionDate={inspectionDate}
             setInspectionDate={setInspectionDate}
             inspectorName={inspectorName}
@@ -597,65 +609,41 @@ export default function InspectionWizard({
             submitError={submitError}
             submitting={submitting}
             onRetry={() => void submit()}
+            showItemRecap={false}
           />
-        )}
+        </div>
       </div>
 
       {/* ===== 画面下部固定バー ===== */}
       <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-        <div className="mx-auto flex max-w-lg items-center gap-3">
-          {isConfirm ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setIndex(items.length - 1)}
-                disabled={submitting}
-                className="inline-flex h-14 w-24 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-5 w-5" />
-                戻る
-              </button>
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={submitting || incomplete.length > 0}
-                className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-orange-700 text-lg font-bold text-white shadow-sm hover:bg-orange-800 disabled:opacity-40"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    送付中…
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-6 w-6" />
-                    送付（申請）する
-                  </>
-                )}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
-                disabled={index === 0}
-                className="inline-flex h-12 w-24 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-5 w-5" />
-                戻る
-              </button>
-              <button
-                type="button"
-                onClick={() => setIndex((i) => Math.min(items.length, i + 1))}
-                disabled={!currentEval?.done}
-                className="inline-flex h-12 flex-1 items-center justify-center gap-1 rounded-xl bg-orange-700 text-base font-bold text-white shadow-sm hover:bg-orange-800 disabled:opacity-40"
-              >
-                {index === items.length - 1 ? "確認へ" : "次へ"}
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </>
+        <div className="mx-auto flex max-w-lg flex-col gap-1.5">
+          {incomplete.length > 0 && (
+            <button
+              type="button"
+              onClick={() => scrollToItem(incomplete[0].i)}
+              className="text-xs font-medium text-amber-700 underline"
+            >
+              未入力が {incomplete.length} 件あります（最初の項目へ移動）
+            </button>
           )}
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={submitting || incomplete.length > 0}
+            className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-orange-700 text-lg font-bold text-white shadow-sm hover:bg-orange-800 disabled:opacity-40"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                送付中…
+              </>
+            ) : (
+              <>
+                <Send className="h-6 w-6" />
+                送付（申請）する
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -1174,6 +1162,7 @@ function ConfirmScreen({
   submitError,
   submitting,
   onRetry,
+  showItemRecap = true,
 }: {
   items: InspectionItem[];
   evals: ItemEval[];
@@ -1190,6 +1179,8 @@ function ConfirmScreen({
   submitError: string | null;
   submitting: boolean;
   onRetry: () => void;
+  /** 1ページ入力では入力欄そのものが上に並ぶため、項目の判定一覧の再掲を省く */
+  showItemRecap?: boolean;
 }) {
   const [preview, setPreview] = useState<{ type: MediaType; url: string } | null>(null);
   return (
@@ -1198,8 +1189,9 @@ function ConfirmScreen({
       <div className="mb-4">
         <h2 className="text-base font-bold text-slate-800">内容の確認（送付前）</h2>
         <p className="mt-0.5 text-sm text-slate-500">
-          この内容で<strong className="font-semibold text-slate-700">送付（申請）</strong>
-          します。ご確認のうえ、画面下の「送付（申請）する」を押してください。項目をタップすると修正できます。
+          {showItemRecap
+            ? "この内容で送付（申請）します。ご確認のうえ、画面下の「送付（申請）する」を押してください。項目をタップすると修正できます。"
+            : "点検日・記録者・備考を確認し、画面下の「送付（申請）する」を押してください。"}
         </p>
       </div>
 
@@ -1264,115 +1256,119 @@ function ConfirmScreen({
       )}
 
       {/* 記録の全体（項目ごと・写真/メディアはタップでプレビュー、見出しタップで修正） */}
-      <div className="mb-2 text-xs font-semibold text-slate-500">点検項目（{items.length}件）</div>
-      <ul className="mb-5 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        {items.map((item, i) => {
-          const ev = evals[i];
-          const a = getAns(item.id);
-          const ng = ev.effJudgment === "ng";
-          const valueLabel =
-            item.itemType === "numeric" && ev.numericValue != null
-              ? `${ev.numericValue}${item.unit ? ` ${item.unit}` : ""}`
-              : item.itemType === "text"
-                ? a.text.trim() || "（未記入）"
-                : "";
-          const comment = item.itemType !== "text" ? a.text.trim() : "";
-          return (
-            <li key={item.id} className={ng ? "bg-red-50" : ""}>
-              <div className="flex items-start gap-3 p-3">
-                <span className="w-5 shrink-0 pt-0.5 text-xs text-slate-400">{i + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => jumpTo(i)}
-                    className="block w-full text-left"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className={`text-sm font-medium ${ng ? "font-bold text-red-700" : "text-slate-800"}`}
-                      >
-                        {item.label}
-                      </span>
-                      <Pencil className="h-3 w-3 shrink-0 text-slate-300" />
-                    </span>
-                    {valueLabel && (
-                      <span className="mt-0.5 block text-sm text-slate-700">{valueLabel}</span>
-                    )}
-                    {comment && (
-                      <span className="mt-0.5 block whitespace-pre-wrap text-xs text-slate-500">
-                        {comment}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* 添付（写真・音声・動画）: タップでプレビュー */}
-                  {(a.photoUrl || a.media.length > 0) && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {a.photoUrl && (
-                        <button
-                          type="button"
-                          onClick={() => setPreview({ type: "photo", url: a.photoUrl! })}
-                          className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200"
+      {showItemRecap && (
+        <>
+        <div className="mb-2 text-xs font-semibold text-slate-500">点検項目（{items.length}件）</div>
+        <ul className="mb-5 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          {items.map((item, i) => {
+            const ev = evals[i];
+            const a = getAns(item.id);
+            const ng = ev.effJudgment === "ng";
+            const valueLabel =
+              item.itemType === "numeric" && ev.numericValue != null
+                ? `${ev.numericValue}${item.unit ? ` ${item.unit}` : ""}`
+                : item.itemType === "text"
+                  ? a.text.trim() || "（未記入）"
+                  : "";
+            const comment = item.itemType !== "text" ? a.text.trim() : "";
+            return (
+              <li key={item.id} className={ng ? "bg-red-50" : ""}>
+                <div className="flex items-start gap-3 p-3">
+                  <span className="w-5 shrink-0 pt-0.5 text-xs text-slate-400">{i + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => jumpTo(i)}
+                      className="block w-full text-left"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className={`text-sm font-medium ${ng ? "font-bold text-red-700" : "text-slate-800"}`}
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={a.photoUrl} alt="点検写真" className="h-full w-full object-cover" />
-                        </button>
+                          {item.label}
+                        </span>
+                        <Pencil className="h-3 w-3 shrink-0 text-slate-300" />
+                      </span>
+                      {valueLabel && (
+                        <span className="mt-0.5 block text-sm text-slate-700">{valueLabel}</span>
                       )}
-                      {a.media.map((m, mi) => (
-                        <button
-                          key={`${m.url}-${mi}`}
-                          type="button"
-                          onClick={() => setPreview({ type: m.type, url: m.url })}
-                          className="inline-flex h-14 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                        >
-                          {m.type === "audio" ? (
-                            <Volume2 className="h-4 w-4 text-orange-700" />
-                          ) : m.type === "video" ? (
-                            <Play className="h-4 w-4 text-orange-700" />
-                          ) : (
-                            <Camera className="h-4 w-4 text-orange-700" />
-                          )}
-                          {m.durationSec != null
-                            ? formatDuration(m.durationSec)
-                            : m.type === "video"
-                              ? "動画"
-                              : m.type === "audio"
-                                ? "音声"
-                                : "写真"}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                      {comment && (
+                        <span className="mt-0.5 block whitespace-pre-wrap text-xs text-slate-500">
+                          {comment}
+                        </span>
+                      )}
+                    </button>
 
-                <span className="shrink-0 pt-0.5">
-                  {ev.effJudgment === "ng" ? (
-                    <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 ring-1 ring-inset ring-red-600/20">
-                      NG
-                    </span>
-                  ) : ev.effJudgment === "ok" ? (
-                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                      OK
-                    </span>
-                  ) : ev.effJudgment === "na" ? (
-                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-500/20">
-                      該当なし
-                    </span>
-                  ) : ev.done ? (
-                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-500/20">
-                      —
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
-                      未入力
-                    </span>
-                  )}
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                    {/* 添付（写真・音声・動画）: タップでプレビュー */}
+                    {(a.photoUrl || a.media.length > 0) && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {a.photoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setPreview({ type: "photo", url: a.photoUrl! })}
+                            className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={a.photoUrl} alt="点検写真" className="h-full w-full object-cover" />
+                          </button>
+                        )}
+                        {a.media.map((m, mi) => (
+                          <button
+                            key={`${m.url}-${mi}`}
+                            type="button"
+                            onClick={() => setPreview({ type: m.type, url: m.url })}
+                            className="inline-flex h-14 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                          >
+                            {m.type === "audio" ? (
+                              <Volume2 className="h-4 w-4 text-orange-700" />
+                            ) : m.type === "video" ? (
+                              <Play className="h-4 w-4 text-orange-700" />
+                            ) : (
+                              <Camera className="h-4 w-4 text-orange-700" />
+                            )}
+                            {m.durationSec != null
+                              ? formatDuration(m.durationSec)
+                              : m.type === "video"
+                                ? "動画"
+                                : m.type === "audio"
+                                  ? "音声"
+                                  : "写真"}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="shrink-0 pt-0.5">
+                    {ev.effJudgment === "ng" ? (
+                      <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 ring-1 ring-inset ring-red-600/20">
+                        NG
+                      </span>
+                    ) : ev.effJudgment === "ok" ? (
+                      <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                        OK
+                      </span>
+                    ) : ev.effJudgment === "na" ? (
+                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-500/20">
+                        該当なし
+                      </span>
+                    ) : ev.done ? (
+                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-500/20">
+                        —
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                        未入力
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        </>
+      )}
 
       {/* 点検日・点検者・全体メモ */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5">

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, Image as ImageIcon, RotateCcw, Trash2, Loader2 } from "lucide-react";
 import { compressImageFile } from "@/lib/imageCompress";
+import { captureFromNativeCamera } from "@/lib/capturePhoto";
 
 type UploadState = "idle" | "compressing" | "uploading" | "done" | "error";
 
@@ -59,6 +60,17 @@ export default function PhotoInput({
     if (file) void upload(file);
   }
 
+  /** 「撮影する」。iOSアプリではカメラを直接起動し、それ以外は capture 付き input に委ねる。 */
+  async function onCamera() {
+    const r = await captureFromNativeCamera();
+    if (r.status === "captured") {
+      void upload(r.file);
+      return;
+    }
+    if (r.status === "cancelled") return;
+    cameraRef.current?.click();
+  }
+
   const busy = state === "compressing" || state === "uploading";
 
   return (
@@ -73,7 +85,7 @@ export default function PhotoInput({
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => cameraRef.current?.click()}
+              onClick={() => void onCamera()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
               <RotateCcw className="h-4 w-4" />
@@ -98,7 +110,7 @@ export default function PhotoInput({
             <button
               type="button"
               disabled={busy}
-              onClick={() => cameraRef.current?.click()}
+              onClick={() => void onCamera()}
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-orange-700 text-sm font-semibold text-white hover:bg-orange-800 disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
