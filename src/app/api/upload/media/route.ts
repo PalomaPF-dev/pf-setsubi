@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { authOptions } from "@/lib/authOptions";
 import { getCompanyEntitlement } from "@/lib/entitlement";
-import { getStorage, getUploadMode, isStorageConfigured } from "@/lib/storage";
+import { APP_PREFIX, getStorage, getUploadMode, isStorageConfigured } from "@/lib/storage";
 import {
   MEDIA_MAX_BYTES,
   IMAGE_MAX_BYTES,
@@ -72,8 +72,8 @@ export async function POST(req: Request): Promise<NextResponse> {
         body,
         request: req,
         onBeforeGenerateToken: async (pathname, clientPayload) => {
-          // クロステナント書き込みの遮断: パスは必ず自社プレフィックス
-          if (!pathname.startsWith(`media/${companyId}/`)) {
+          // クロステナント・他アプリへの書き込みを遮断: パスは必ず自アプリ+自社プレフィックス
+          if (!pathname.startsWith(`${APP_PREFIX}/media/${companyId}/`)) {
             throw new Error("アップロード先が不正です");
           }
           let mediaType: MediaTypeParam = "photo";
