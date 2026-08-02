@@ -6,7 +6,13 @@ import path from "path";
  * - クラウド版: Vercel Blob（access: public、推測不能 URL）
  * - オンプレ版: ローカルファイルシステム + /api/files/ の認証付き配信
  * 選択は STORAGE_DRIVER 明示 > BLOB_READ_WRITE_TOKEN の有無。env が無ければ現行動作。
+ *
+ * 社内共通の統一 Blob Store（sumakouba-shared-blob 等）に複数アプリを接続する運用に伴い、
+ * このアプリが書き込む全キーの先頭に APP_PREFIX を付与する。他アプリ（hinshitsu/kanagata/keisoku等）
+ * と同一 Store を共有してもパスが衝突しないようにするための区画分け。
+ * クライアント直接アップロード（uploadMedia.ts）側でも同じ APP_PREFIX を使うこと。
  */
+export const APP_PREFIX = "setsubi";
 
 export interface SaveFileOpts {
   /** local ドライバのテナント分離・認可キー（vercel-blob では未使用） */
@@ -65,13 +71,18 @@ export function isOwnMediaUrl(url: string, companyId: string): boolean {
     if (u.protocol !== "https:" || !u.hostname.endsWith(".public.blob.vercel-storage.com")) {
       return false;
     }
-    // 全テナントが同一 Blob ストアを共有するため、ホスト名だけでは他社 URL を弾けない。
-    // アップロード発行時（/api/upload/media の onBeforeGenerateToken）が
-    // pathname を必ず `media/<companyId>/...` にしているので、読み取り側もパスで確認する。
-    // `inspection/<companyId>/` は旧・点検写真アップロードのプレフィックス
-    // （送付前の下書きに残っている既存 URL を弾かないための後方互換）。
+    // 全テナント・全アプリが同一 Blob ストアを共有するため、ホスト名だけでは他社/他アプリの
+    // URL を弾けない。アップロード発行時（/api/upload/media の onBeforeGenerateToken）が
+    // pathname を必ず `<APP_PREFIX>/media/<companyId>/...` にしているので、読み取り側もパスで
+    // 確認する。プレフィックス無しの旧パスは、社内Store統一（アプリ単位のプレフィックス導入）
+    // より前にアップロード済みの既存ファイルを弾かないための後方互換。
     const path = u.pathname.replace(/^\//, "");
-    return path.startsWith(`media/${companyId}/`) || path.startsWith(`inspection/${companyId}/`);
+    return (
+      path.startsWith(`${APP_PREFIX}/media/${companyId}/`) ||
+      path.startsWith(`${APP_PREFIX}/inspection/${companyId}/`) ||
+      path.startsWith(`media/${companyId}/`) || // 旧パス（Store統一前）
+      path.startsWith(`inspection/${companyId}/`) // 旧パス（Store統一前）
+    );
   } catch {
     return false;
   }
@@ -100,7 +111,7 @@ const vercelBlobDriver: Storage = {
       throw new Error("Blob ストレージ未設定です（BLOB_READ_WRITE_TOKEN）。Vercel Blob を接続してください。");
     }
     const { put } = await import("@vercel/blob");
-    const blob = await put(key, file, { access: "public", token });
+    const blob = await put(`${APP_PREFIX}/${key}`, file, { access: "public", token });
     return { url: blob.url };
   },
   async deleteFiles(urls) {

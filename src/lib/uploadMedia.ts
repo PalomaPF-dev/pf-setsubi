@@ -8,6 +8,10 @@ import { MEDIA_MAX_BYTES, IMAGE_MAX_BYTES, extensionForContentType } from "./med
  * モジュール内にキャッシュする（実行時固定のため）。
  */
 
+// 社内共通の統一 Blob Store を他アプリと共有するための区画分け。
+// storage.ts の APP_PREFIX と必ず一致させること（サーバー側 onBeforeGenerateToken の検証と対）。
+const APP_PREFIX = "setsubi";
+
 export type MediaKind = "ref" | "spot" | "result" | "sitemap" | "diagram";
 export type UploadMediaType = "photo" | "audio" | "video" | "image";
 
@@ -57,7 +61,7 @@ export async function uploadMedia(
     const { upload } = await import("@vercel/blob/client");
     const baseType = (file.type || "application/octet-stream").split(";")[0].trim().toLowerCase();
     const ext = opts.fileName?.split(".").pop() || extensionForContentType(baseType);
-    const pathname = `media/${info.companyId}/${opts.kind}/${safeScope}/${Date.now()}.${ext}`;
+    const pathname = `${APP_PREFIX}/media/${info.companyId}/${opts.kind}/${safeScope}/${Date.now()}.${ext}`;
     const result = await upload(pathname, file, {
       access: "public",
       handleUploadUrl: "/api/upload/media",
