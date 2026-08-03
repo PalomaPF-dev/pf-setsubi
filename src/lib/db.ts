@@ -1045,13 +1045,16 @@ export async function findRecordIdByClientKey(
 
 /**
  * 承認ルーティングの閲覧スコープ（管理者向け）。
- * 設定すると、承認待ち（pending）の記録は「提出者の指名承認者が未設定
- * （approver_login_id IS NULL）または自分の login_id と一致」するものだけに絞られる。
- * 提出者が特定できない記録（inspector_user_id なし・ユーザー削除済み）は指名なし扱いで表示する。
+ * 設定すると、承認待ち（pending）の記録は「提出者の指名承認者＝自分」のもの、
+ * つまり自分が承認の番である記録だけに絞られる（承認者として登録されているだけでは表示しない）。
+ * unassignedOnly=true のときは逆に「承認者が解決できない記録」
+ * （指名なし・提出者不明・ユーザー削除済み）だけを返す（担当未指定の確認用）。
  * pending 以外の記録には影響しない。非管理者にはこのスコープを渡さない（従来どおり全件）。
  */
 export interface ApprovalScope {
   loginId: string | null;
+  /** true: 承認者が解決できない承認待ちだけを返す（既定 false=自分宛てのみ） */
+  unassignedOnly?: boolean;
 }
 
 export interface RecordFilters {
@@ -1077,10 +1080,11 @@ export async function listRecords(
   const sql = getSql();
   // 既定は一覧表示向けの 200。CSVエクスポートは明示的に大きな値を渡す（上限 10000）。
   const limit = Math.min(filters.limit ?? 200, 10000);
-  // 承認ルーティング: スコープ指定時、pending 記録は「提出者の指名承認者が
-  // 未設定 or 自分」のものだけ（提出者不明は指名なし扱い = 表示）。
+  // 承認ルーティング: スコープ指定時、pending 記録は「提出者の指名承認者＝自分」
+  // （＝自分が承認の番）のものだけ。unassignedOnly なら承認者未解決のものだけ。
   const scopeActive = filters.approvalScope != null;
   const scopeLoginId = filters.approvalScope?.loginId ?? null;
+  const scopeUnassigned = filters.approvalScope?.unassignedOnly === true;
   const rows = await sql`
     SELECT r.*, e.name AS equipment_name, e.management_no
     FROM inspection_records r
@@ -1096,11 +1100,16 @@ export async function listRecords(
       AND (${filters.areaId ?? null}::uuid IS NULL OR e.area_id = ${filters.areaId ?? null}::uuid)
       AND (${scopeActive}::boolean = false
            OR r.approval_status <> 'pending'
-           OR NOT EXISTS (
-                SELECT 1 FROM users su
-                WHERE su.id = r.inspector_user_id
-                  AND su.approver_login_id IS NOT NULL
-                  AND su.approver_login_id IS DISTINCT FROM ${scopeLoginId}::text))
+           OR (${scopeUnassigned}::boolean = true
+               AND NOT EXISTS (
+                    SELECT 1 FROM users su
+                    WHERE su.id = r.inspector_user_id
+                      AND su.approver_login_id IS NOT NULL))
+           OR (${scopeUnassigned}::boolean = false
+               AND EXISTS (
+                    SELECT 1 FROM users su
+                    WHERE su.id = r.inspector_user_id
+                      AND su.approver_login_id = ${scopeLoginId}::text)))
     ORDER BY r.inspection_date DESC, r.created_at DESC
     LIMIT ${limit}`;
   return rows.map(mapRecord);
@@ -1642,7 +1651,7 @@ export async function dashboardCounts(
     WHERE ca.company_id = ${companyId}
       AND (${siteId}::uuid IS NULL OR e.site_id = ${siteId}::uuid)
       AND (${areaId}::uuid IS NULL OR e.area_id = ${areaId}::uuid)`;
-  // 承認ルーティング: 管理者にはスコープを渡し、自分宛て（指名なし含む）の承認待ちだけ数える
+  // 承認ルーティング: 管理者にはスコープを渡し、自分が承認の番の承認待ちだけ数える
   const scopeActive = approvalScope != null;
   const scopeLoginId = approvalScope?.loginId ?? null;
   const approvalRows = await sql`
@@ -1652,11 +1661,10 @@ export async function dashboardCounts(
       AND (${siteId}::uuid IS NULL OR e.site_id = ${siteId}::uuid)
       AND (${areaId}::uuid IS NULL OR e.area_id = ${areaId}::uuid)
       AND (${scopeActive}::boolean = false
-           OR NOT EXISTS (
+           OR EXISTS (
                 SELECT 1 FROM users su
                 WHERE su.id = r.inspector_user_id
-                  AND su.approver_login_id IS NOT NULL
-                  AND su.approver_login_id IS DISTINCT FROM ${scopeLoginId}::text))`;
+                  AND su.approver_login_id = ${scopeLoginId}::text))`;
   const e: any = eqRows[0];
   const d: any = dueRows[0];
   const a: any = actionRows[0];
@@ -1675,7 +1683,7 @@ export async function dashboardCounts(
 /**
  * 承認待ち（approval_status='pending'）の件数だけを返す軽量版（ヘッダーバッジ用）。
  * approvalScope 指定時（管理者）は dashboardCounts と同じ承認ルーティングを適用し、
- * 「提出者の指名承認者が未設定 or 自分」の記録だけを数える。単一クエリ。
+ * 「提出者の指名承認者＝自分」＝自分が承認の番の記録だけを数える。単一クエリ。
  */
 export async function pendingApprovalCount(
   companyId: string,
@@ -1689,11 +1697,28 @@ export async function pendingApprovalCount(
     SELECT COUNT(*) AS c FROM inspection_records r
     WHERE r.company_id = ${companyId} AND r.approval_status = 'pending'
       AND (${scopeActive}::boolean = false
-           OR NOT EXISTS (
+           OR EXISTS (
                 SELECT 1 FROM users su
                 WHERE su.id = r.inspector_user_id
-                  AND su.approver_login_id IS NOT NULL
-                  AND su.approver_login_id IS DISTINCT FROM ${scopeLoginId}::text))`;
+                  AND su.approver_login_id = ${scopeLoginId}::text))`;
+  return Number(rows[0].c);
+}
+
+/**
+ * 承認者が解決できない承認待ちの件数（担当未指定・提出者不明・ユーザー削除済み）。
+ * 承認ルーティングを「自分の番のみ」に絞った結果、誰の番にもならない記録が
+ * 埋もれないよう、点検履歴の承認待ちビューに注意書きとして表示するために使う。
+ */
+export async function unassignedPendingApprovalCount(companyId: string): Promise<number> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT COUNT(*) AS c FROM inspection_records r
+    WHERE r.company_id = ${companyId} AND r.approval_status = 'pending'
+      AND NOT EXISTS (
+            SELECT 1 FROM users su
+            WHERE su.id = r.inspector_user_id
+              AND su.approver_login_id IS NOT NULL)`;
   return Number(rows[0].c);
 }
 

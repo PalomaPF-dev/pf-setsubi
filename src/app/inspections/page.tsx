@@ -7,6 +7,7 @@ import {
   listRecords,
   listEquipment,
   listProcedures,
+  unassignedPendingApprovalCount,
   type RecordFilters,
 } from "@/lib/db";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -41,6 +42,7 @@ export default async function InspectionsPage({
     approval?: string;
     from?: string;
     to?: string;
+    unassigned?: string;
   }>;
 }) {
   const session = await requireEntitledSession();
@@ -68,18 +70,28 @@ export default async function InspectionsPage({
   );
 
   let records, equipmentList, procedures;
+  let unassignedPending = 0;
+  const showUnassigned = sp.unassigned === "1";
   try {
     // 所属工場による表示制限（制限ユーザーは自工場の記録・設備のみ）
     const scope = await getFactoryScope(session.companyId, session.userId);
     const scopeSiteId = scopedSiteId(scope);
     filters.siteId = scopeSiteId;
-    // 承認ルーティング: 管理者には「自分宛て（指名なし含む）」の承認待ちだけ表示
+    // 承認ルーティング: 管理者には「自分が承認の番」の承認待ちだけ表示する。
+    // ?unassigned=1 のときは担当未指定（承認者が解決できない）の承認待ちだけを表示
     const routing = await getUserApprovalRouting(session.userId);
-    if (routing?.role === "admin") filters.approvalScope = { loginId: routing.loginId };
-    [records, equipmentList, procedures] = await Promise.all([
+    const isAdmin = routing?.role === "admin";
+    if (isAdmin) {
+      filters.approvalScope = { loginId: routing.loginId, unassignedOnly: showUnassigned };
+    }
+    [records, equipmentList, procedures, unassignedPending] = await Promise.all([
       listRecords(session.companyId, filters),
       listEquipment(session.companyId, undefined, { siteId: scopeSiteId }),
       listProcedures(session.companyId, { includeArchived: true }),
+      // 誰の番にもならない承認待ちが埋もれないよう、承認待ちビューでは件数を出す
+      isAdmin && approvalStatus === "pending"
+        ? unassignedPendingApprovalCount(session.companyId)
+        : Promise.resolve(0),
     ]);
   } catch (e) {
     console.error("[inspections list]", e);
@@ -118,6 +130,28 @@ export default async function InspectionsPage({
           )
         }
       />
+
+      {/* 承認ルーティングの注意書き。承認待ちは「自分が承認の番」だけに絞られるため、
+          誰の番にもならない（担当未指定の）記録が埋もれないよう件数と導線を出す */}
+      {approvalStatus === "pending" && showUnassigned && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          担当未指定の承認待ちを表示しています（提出者に承認者が設定されていない記録）。
+          <Link href="/inspections?approval=pending" className="ml-2 font-medium underline">
+            自分宛てに戻す
+          </Link>
+        </div>
+      )}
+      {approvalStatus === "pending" && !showUnassigned && unassignedPending > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          担当未指定の承認待ちが {unassignedPending} 件あります（提出者に承認者が未設定のため、誰の番にもなっていません）。
+          <Link
+            href="/inspections?approval=pending&unassigned=1"
+            className="ml-2 font-medium underline"
+          >
+            表示する
+          </Link>
+        </div>
+      )}
 
       {/* フィルタ（GET フォーム）。モバイルではアコーディオンに畳んで記録リストを先に見せる */}
       <details className="group mb-4 rounded-2xl border border-slate-200 bg-white sm:hidden">
