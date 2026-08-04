@@ -43,7 +43,7 @@ export default async function NewActionPage({
     const scope = await getFactoryScope(session.companyId, session.userId);
     workerNames = (await listWorkers(session.companyId)).map((w) => w.name);
     // role='worker' は担当者を本人で固定（サーバー側でも強制）
-    isWorker = (await getUserRoleAndFactory(session.userId))?.role === "worker";
+    isWorker = (await getUserRoleAndFactory(session.userId))?.role !== "admin";
     if (itemResultId) {
       ctx = await getItemResultContext(session.companyId, itemResultId);
       if (ctx && scope.restricted) {

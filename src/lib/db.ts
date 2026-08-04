@@ -1509,7 +1509,7 @@ export async function listWorkers(companyId: string): Promise<Worker[]> {
   const sql = getSql();
   const rows = await sql`
     SELECT id, name, created_at FROM users
-    WHERE company_id = ${companyId} AND role = 'worker'
+    WHERE company_id = ${companyId} AND role <> 'admin'
     ORDER BY name ASC`;
   return rows.map((r: any) => ({
     id: r.id as string,

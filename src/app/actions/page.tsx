@@ -64,7 +64,7 @@ export default async function ActionsPage({
     ]);
     workerNames = (await listWorkers(session.companyId)).map((w) => w.name);
     // role='worker' は担当者を本人で固定（サーバー側でも強制）
-    isWorker = (await getUserRoleAndFactory(session.userId))?.role === "worker";
+    isWorker = (await getUserRoleAndFactory(session.userId))?.role !== "admin";
   } catch (e) {
     console.error("[actions]", e);
     return (

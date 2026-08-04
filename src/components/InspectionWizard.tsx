@@ -245,7 +245,8 @@ export default function InspectionWizard({
   const [resume, setResume] = useState<DraftData | null>(null);
   // 作業者（点検開始時に選択）。確定するまで点検項目へ進まない。
   // role='worker' のログインは本人名で固定（選択不可）。
-  const workerLocked = userRole === "worker";
+  // 非管理者（一般。旧作業者を含む）は作業者名を本人で固定（役割統一）
+  const workerLocked = userRole !== undefined && userRole !== "admin";
   const [inspectorName, setInspectorName] = useState<string>(userName ?? "");
   const [workerConfirmed, setWorkerConfirmed] = useState(false);
   const [online, setOnline] = useState(true);

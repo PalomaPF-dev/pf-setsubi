@@ -132,8 +132,9 @@ export async function POST(req: Request) {
         const name = (u?.name ?? "").toString().trim();
         const email = ((u?.email ?? "").toString().trim().toLowerCase() as string) || null;
         // 役割はポータルの3段階（admin=管理者 / worker=作業者 / それ以外は member=一般）
+        // 役割は 管理者(admin) / 一般(member) の2種に統一（旧「作業者(worker)」は一般に丸める）
         const role: "admin" | "member" | "worker" =
-          u?.role === "admin" ? "admin" : u?.role === "worker" ? "worker" : "member";
+          u?.role === "admin" ? "admin" : "member";
         // 指名承認者（承認者の login_id）。null/空文字は「指名なし」。
         const approverLoginId: string | null =
           ((u?.approverLoginId ?? "").toString().trim() as string) || null;
