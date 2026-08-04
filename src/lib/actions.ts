@@ -718,12 +718,12 @@ export async function completeInspectionAction(
     assignment.intervalDays
   );
 
-  // 作業者名: role='worker' は送信値を無視して必ず本人名で保存（サーバー側で強制）。
-  // admin/member は開始時に選択/入力した名前（代理入力）を優先。
+  // 作業者名: 非管理者（一般。旧作業者を含む）は送信値を無視して必ず本人名で保存（サーバー側で強制）。
+  // admin は開始時に選択/入力した名前（代理入力）を優先。
   // 監査用に inspectorUserId は常にログインユーザー。
   const role = (await getUserRoleAndFactory(userId))?.role ?? "admin";
   const inspector =
-    role === "worker"
+    role !== "admin"
       ? userName || "（不明）"
       : (payload.inspectorName ?? "").trim() || userName || "（不明）";
 
@@ -878,7 +878,7 @@ export async function createCorrectiveActionAction(fd: FormData): Promise<void> 
 
   // 担当者: role='worker' は送信値を無視して必ず本人名で保存（サーバー側で強制）
   const role = (await getUserRoleAndFactory(userId))?.role ?? "admin";
-  const assignee = role === "worker" ? userName || null : strOrNull(fd, "assignee");
+  const assignee = role !== "admin" ? userName || null : strOrNull(fd, "assignee");
 
   const itemResultId = strOrNull(fd, "itemResultId");
   let equipmentId: string;
@@ -921,7 +921,7 @@ export async function updateCorrectiveActionAction(id: string, fd: FormData): Pr
   const status = statusRaw === "in_progress" ? "in_progress" : "open";
   // 担当者: role='worker' は送信値を無視して必ず本人名で保存（サーバー側で強制）
   const role = (await getUserRoleAndFactory(userId))?.role ?? "admin";
-  const assignee = role === "worker" ? userName || null : strOrNull(fd, "assignee");
+  const assignee = role !== "admin" ? userName || null : strOrNull(fd, "assignee");
   await updateCorrectiveAction(companyId, id, {
     title,
     detail: strOrNull(fd, "detail"),
