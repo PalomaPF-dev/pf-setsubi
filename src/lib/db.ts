@@ -1286,21 +1286,30 @@ export async function resubmitRecord(companyId: string, recordId: string): Promi
 }
 
 /**
- * 承認依頼メールの宛先。設定の approver_email（区切り文字で複数可）を優先し、
- * 未設定なら会社の全ユーザー宛（点検アラートと同じ挙動）。
+ * 承認依頼メールの宛先＝**ポータルで承認者として指名されている人**。
+ * ポータルのユーザー設定で職場の管理者が既定の承認者として各アプリへ連携され、
+ * users.approver_login_id に入る。その login_id を持つユーザーのメールを宛先にする。
+ *
+ * factory を渡すと「その工場に所属する人の承認者」だけに絞る。
+ * アプリ内に承認者メールの設定は持たないため、**該当者が居なければ空＝送信しない**
+ * （以前の「会社設定の承認者メール → 全ユーザー」フォールバックは廃止）。
  */
-export async function listApproverEmails(companyId: string): Promise<string[]> {
+export async function listApproverEmails(
+  companyId: string,
+  factory?: string | null
+): Promise<string[]> {
   await ensureSchema();
   const sql = getSql();
-  const rows = await sql`SELECT approver_email FROM companies WHERE id = ${companyId} LIMIT 1`;
-  const configured = String(rows[0]?.approver_email ?? "")
-    .split(/[,;\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (configured.length > 0) return [...new Set(configured)];
-  // email は任意項目（NULL 可）なので未登録ユーザーは宛先から除外
-  const users = await sql`SELECT email FROM users WHERE company_id = ${companyId}`;
-  return users.map((u: any) => (u.email as string | null) ?? "").filter(Boolean);
+  const f = factory ?? null;
+  const rows = await sql`
+    SELECT DISTINCT a.email
+    FROM users u
+    JOIN users a ON a.company_id = u.company_id AND a.login_id = u.approver_login_id
+    WHERE u.company_id = ${companyId}
+      AND u.approver_login_id IS NOT NULL
+      AND (${f}::text IS NULL OR u.factory = ${f})
+      AND a.email IS NOT NULL AND btrim(a.email) <> ''`;
+  return rows.map((r: any) => String(r.email).trim()).filter(Boolean);
 }
 
 /**

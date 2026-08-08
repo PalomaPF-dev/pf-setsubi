@@ -538,8 +538,8 @@ async function notifyApprovalRequested(opts: {
   const mailer = getMailer();
   if (!mailer) return;
   try {
-    // 提出者に指名承認者（approver_login_id）がいてメールを持っていればその人だけに送り、
-    // いなければ従来どおり（会社設定の承認者メール → 全ユーザー）にフォールバック。
+    // 宛先はポータル連携の承認者。点検した本人の指名承認者（approver_login_id）を優先し、
+    // 指名が無ければ会社の承認者へ送る（どちらも居なければ送信しない）。
     let to: string[] = [];
     if (opts.inspectorUserId) {
       const designated = await designatedApproverEmailForUser(opts.inspectorUserId);
