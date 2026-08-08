@@ -123,9 +123,7 @@ function LoginInner() {
           </p>
 
           <div className="mt-3 text-center text-sm">
-            <Link href="/password-reset" className="text-[#f27524] hover:underline">
-              パスワードをお忘れの方はこちら
-            </Link>
+            <span className="text-[#707070]">パスワードの再設定はポータルで行います</span>
             <p className="mt-1 text-xs text-[#707070]">
               メール未登録の方は
               <ContactAdminModal />
