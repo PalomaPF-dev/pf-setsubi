@@ -60,7 +60,16 @@ export function parseCriteria(
     const m = rest.match(/^\s*([a-zA-Zμ℃%°Ω/·²³]+)/);
     return m ? m[1] : null;
   };
-  let m = s.match(new RegExp(`${NUM_RE}\\s*~\\s*${NUM_RE}(.*)$`));
+  // 「0.4±0.05Mpa」のような中心値±公差（点検表で最も多い書き方）
+  let m = s.match(new RegExp(`${NUM_RE}\\s*±\\s*${NUM_RE}(.*)$`));
+  if (m) {
+    const center = Number(m[1]);
+    const tol = Math.abs(Number(m[2]));
+    // 0.4-0.05 が 0.35000000000000003 になるため丸める
+    const fix = (n: number) => Number(n.toFixed(10));
+    return { min: fix(center - tol), max: fix(center + tol), unit: unitOf(m[3]) };
+  }
+  m = s.match(new RegExp(`${NUM_RE}\\s*~\\s*${NUM_RE}(.*)$`));
   if (m) return { min: Number(m[1]), max: Number(m[2]), unit: unitOf(m[3]) };
   m = s.match(new RegExp(`${NUM_RE}(.*?)(以上|min)`, "i"));
   if (m) return { min: Number(m[1]), max: null, unit: unitOf(m[2]) };
@@ -79,7 +88,19 @@ function guessItemType(label: string, hasNumericHint: boolean): ItemType {
 
 function buildItem(
   rawLabel: string,
-  opts: { criteria?: string | null; instruction?: string | null; unit?: string | null; min?: number | null; max?: number | null }
+  opts: {
+    criteria?: string | null;
+    instruction?: string | null;
+    unit?: string | null;
+    min?: number | null;
+    max?: number | null;
+    /** 基準列が無い表で、項目名そのものから基準値を読み取る */
+    scanLabel?: boolean;
+    /** 「【数値記入】」や記録欄の単位から数値入力と判っている */
+    forceNumeric?: boolean;
+    /** 大分類・中分類（「日常点検 / エアー圧」など）。点検方法欄の先頭に残す */
+    category?: string | null;
+  }
 ): ImportDraftItem {
   let label = norm(rawLabel);
   const parsed = opts.criteria ? parseCriteria(opts.criteria) : null;
@@ -97,9 +118,19 @@ function buildItem(
       label = norm(label.slice(0, pm.index));
     }
   }
-  const numeric = min != null || max != null || !!unit;
+  // 「流量検査圧 2.0kPa以上」のように項目名と基準が同じセルに書かれている表
+  if (min == null && max == null && opts.scanLabel) {
+    const fromLabel = parseCriteria(label);
+    if (fromLabel) {
+      min = fromLabel.min;
+      max = fromLabel.max;
+      // 記入欄に刷り込まれた単位のほうが確かなので、そちらを優先する
+      unit = unit ?? fromLabel.unit;
+    }
+  }
+  const numeric = min != null || max != null || !!unit || !!opts.forceNumeric;
   // 数値として読み取れなかった基準表記は点検方法欄に残して情報を落とさない
-  const instructionParts = [norm(opts.instruction ?? "")];
+  const instructionParts = [norm(opts.category ?? ""), norm(opts.instruction ?? "")];
   if (opts.criteria && !parsed) instructionParts.push(`基準: ${norm(opts.criteria)}`);
   const instruction = instructionParts.filter(Boolean).join(" / ");
   const itemType = guessItemType(label, numeric);
@@ -121,7 +152,19 @@ const METHOD_HEADER_RE = /^(点検方法|確認方法|方法|要領|注意事項
 const UNIT_HEADER_RE = /^単位/;
 const MIN_HEADER_RE = /^(下限|最小|min)/i;
 const MAX_HEADER_RE = /^(上限|最大|max)/i;
-const TITLE_RE = /(点検表|点検チェック|チェックシート|チェックリスト|点検記録|点検基準)/;
+// 半角カナの帳票名（「設備点検ﾁｪｯｸｼｰﾄ」など）も拾う
+const TITLE_RE = /(点検表|点検チェック|チェックシート|チェックリスト|ﾁｪｯｸｼｰﾄ|ﾁｪｯｸﾘｽﾄ|点検記録|点検基準)/;
+/** 日々の記入欄（「日付」の右に 1〜31 が並ぶ）の見出し */
+const RECORD_HEADER_RE = /^(日付|点検日|実施日|月日|記録|点検年月日)/;
+/** 数値記入であることを表す注記（記入欄の書式指定） */
+const NUMERIC_MARK_RE = /[【[（(]\s*数値記入\s*[】\])）]/;
+/** 記入欄にあらかじめ刷り込まれた単位（「kPa」「A」「℃」など） */
+const UNIT_CELL_RE = /^[a-zA-Zμ℃%°Ω/·²³㎜㎝㎡㎥]{1,6}$/;
+/** 点検周期を表す大分類（日常点検 / 月点検 …）。手順書の分割に使う */
+const FREQ_RE =
+  /^(日常|毎日|始業|終業|日々|週|毎週|週次|月|毎月|月次|隔月|半期|四半期|年|毎年|年次|\d+[ヶヵかカ]?月|\d+年)\s*(点検|検査|確認|チェック)?$/;
+/** 帳票の対象（設備名など）を示す見出しセル */
+const SUBJECT_LABEL_RE = /^(設備名|機械名|装置名|機種名|対象設備|設備)$/;
 
 /** 「1」「レ」「済」等、点検票の記入欄・番号だけのセルはラベルとして扱わない */
 function isMeaningfulLabel(s: string): boolean {
@@ -132,31 +175,101 @@ function isMeaningfulLabel(s: string): boolean {
 }
 
 /**
- * 文字列グリッド（Excel シートまたは CSV）から手順書ドラフトを1つ抽出する。
+ * 記録欄（「日付」の右に 1〜31 が並ぶ列群）の開始列を推定する。無ければ -1。
+ * 記録欄は項目の情報ではないので、列見出しの探索範囲から外す。
+ */
+function detectRecordStart(header: string[]): number {
+  const marked = header.findIndex((c) => RECORD_HEADER_RE.test(c ?? ""));
+  if (marked >= 0) return marked + 1;
+  for (let i = 0; i < header.length; i++) {
+    let n = 0;
+    while (i + n < header.length && toHalfWidth(header[i + n] ?? "").trim() === String(n + 1)) n++;
+    if (n >= 5) return i;
+  }
+  return -1;
+}
+
+/**
+ * 記録欄にあらかじめ単位（「kPa」等）が刷り込まれている行は数値記入欄。
+ * 3セル以上が同じ単位表記なら、その単位を採用する。
+ */
+function recordUnit(row: string[], recordStart: number): string | null {
+  if (recordStart < 0) return null;
+  const vals = row.slice(recordStart).map((c) => norm(c ?? "")).filter(Boolean);
+  if (vals.length < 3) return null;
+  const first = vals[0];
+  if (!UNIT_CELL_RE.test(first)) return null;
+  return vals.every((v) => v === first) ? first : null;
+}
+
+/** 帳票の対象（設備名）を見出しセルの右隣から拾う */
+function findSubject(rows: string[][], endRow: number): string | null {
+  for (let i = 0; i < endRow; i++) {
+    for (let c = 0; c < rows[i].length; c++) {
+      if (!SUBJECT_LABEL_RE.test(rows[i][c] ?? "")) continue;
+      const v = rows[i].slice(c + 1).find((x) => x && x.length >= 2 && x.length <= 60);
+      if (v) return v;
+    }
+  }
+  return null;
+}
+
+/**
+ * 文字列グリッド（Excel シートまたは CSV）から手順書ドラフトを抽出する。
  * ヘッダ行（「点検項目」等の列名）を探し、見つかればその列対応で、
  * 見つからなければ「テキストが最も多い列」をラベル列とみなして抽出する。
+ *
+ * 「点検項目 | 中分類 | 点検内容・規格 | 日付 1 2 3 …」のような日本の点検表では
+ * 左側の列が結合セルの大分類・中分類になっているため、
+ * 実際に項目文が並ぶ列をラベル列、その左をカテゴリとして扱う。
+ * 大分類が点検周期（日常点検 / 月点検）なら、周期ごとに手順書を分ける。
  */
 export function parseGrid(
   grid: string[][],
   fallbackName: string,
   source: string
-): ProcedureDraft | null {
-  const rows = grid.map((r) => r.map(norm));
+): ProcedureDraft[] {
+  const rows = grid.map((r) => (r ?? []).map((c) => norm(c ?? "")));
 
   // ヘッダ行の検出（先頭20行以内）
   let headerRowIdx = -1;
-  let cols: { label: number; criteria: number; method: number; unit: number; min: number; max: number } | null = null;
+  let recordStart = -1;
+  let cols:
+    | { label: number; criteria: number; method: number; unit: number; min: number; max: number; groups: number[] }
+    | null = null;
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
-    const labelCol = rows[i].findIndex((c) => LABEL_HEADER_RE.test(c));
-    if (labelCol < 0) continue;
+    const header = rows[i];
+    const rs = detectRecordStart(header);
+    const limit = rs > 0 ? rs : header.length;
+    const below = rows.slice(i + 1);
+    const density = (c: number) => below.filter((r) => isMeaningfulLabel(r[c] ?? "")).length;
+    const cands: number[] = [];
+    for (let c = 0; c < limit; c++) if (LABEL_HEADER_RE.test(header[c] ?? "")) cands.push(c);
+    if (cands.length === 0) continue;
+    // 見出しが複数ある表では、下に項目文が最も多く並ぶ列を本命のラベル列とする
+    let labelCol = cands[0];
+    let labelCount = -1;
+    for (const c of cands) {
+      const n = density(c);
+      if (n > labelCount) { labelCount = n; labelCol = c; }
+    }
+    // ラベル列より左の、値がまばらに入る列＝結合セルの大分類・中分類
+    const groups: number[] = [];
+    for (let c = 0; c < labelCol; c++) {
+      const n = density(c);
+      if (n > 0 && n < labelCount) groups.push(c);
+    }
+    const find = (re: RegExp) => header.findIndex((c, ci) => ci !== labelCol && ci < limit && re.test(c ?? ""));
     headerRowIdx = i;
+    recordStart = rs;
     cols = {
       label: labelCol,
-      criteria: rows[i].findIndex((c) => CRITERIA_HEADER_RE.test(c)),
-      method: rows[i].findIndex((c) => METHOD_HEADER_RE.test(c)),
-      unit: rows[i].findIndex((c) => UNIT_HEADER_RE.test(c)),
-      min: rows[i].findIndex((c) => MIN_HEADER_RE.test(c)),
-      max: rows[i].findIndex((c) => MAX_HEADER_RE.test(c)),
+      criteria: find(CRITERIA_HEADER_RE),
+      method: find(METHOD_HEADER_RE),
+      unit: find(UNIT_HEADER_RE),
+      min: find(MIN_HEADER_RE),
+      max: find(MAX_HEADER_RE),
+      groups,
     };
     break;
   }
@@ -168,24 +281,46 @@ export function parseGrid(
     const hit = rows[i].find((c) => c && TITLE_RE.test(c) && c.length <= 60);
     if (hit) title = hit;
   }
+  const subject = findSubject(rows, titleScanEnd);
 
-  const items: ImportDraftItem[] = [];
+  // 大分類（あれば）ごとに項目を貯める。キー "" は分類なし。
+  const buckets = new Map<string, ImportDraftItem[]>();
+  const total = () => [...buckets.values()].reduce((n, v) => n + v.length, 0);
+  const put = (bucket: string, item: ImportDraftItem) => {
+    const arr = buckets.get(bucket) ?? [];
+    arr.push(item);
+    buckets.set(bucket, arr);
+  };
   const at = (row: string[], idx: number): string => (idx >= 0 ? row[idx] ?? "" : "");
 
   if (cols) {
-    for (let i = headerRowIdx + 1; i < rows.length && items.length < IMPORT_LIMITS.maxItemsPerDraft; i++) {
+    // 結合セルは先頭行にしか値が無いので、直近の値を持ち回る
+    const current = new Map<number, string>();
+    for (let i = headerRowIdx + 1; i < rows.length && total() < IMPORT_LIMITS.maxItemsPerDraft; i++) {
       const row = rows[i];
-      const label = at(row, cols.label);
+      for (const g of cols.groups) {
+        const v = at(row, g);
+        if (isMeaningfulLabel(v)) current.set(g, v);
+      }
+      const raw = at(row, cols.label);
+      if (!isMeaningfulLabel(raw)) continue;
+      const forceNumeric = NUMERIC_MARK_RE.test(raw);
+      const label = norm(raw.replace(new RegExp(NUMERIC_MARK_RE, "g"), " "));
       if (!isMeaningfulLabel(label)) continue;
       const minS = toHalfWidth(at(row, cols.min));
       const maxS = toHalfWidth(at(row, cols.max));
-      items.push(
+      const path = cols.groups.map((g) => current.get(g)).filter(Boolean) as string[];
+      put(
+        path[0] ?? "",
         buildItem(label, {
           criteria: at(row, cols.criteria) || null,
           instruction: at(row, cols.method) || null,
-          unit: at(row, cols.unit) || null,
+          unit: at(row, cols.unit) || recordUnit(row, recordStart) || null,
           min: /^[-+]?\d+(\.\d+)?$/.test(minS) ? Number(minS) : null,
           max: /^[-+]?\d+(\.\d+)?$/.test(maxS) ? Number(maxS) : null,
+          scanLabel: cols.criteria < 0,
+          forceNumeric: forceNumeric || !!recordUnit(row, recordStart),
+          category: path.join(" / ") || null,
         })
       );
     }
@@ -200,22 +335,40 @@ export function parseGrid(
     }
     if (best >= 0 && bestCount >= 2) {
       for (const row of rows) {
-        if (items.length >= IMPORT_LIMITS.maxItemsPerDraft) break;
+        if (total() >= IMPORT_LIMITS.maxItemsPerDraft) break;
         const label = row[best] ?? "";
         if (!isMeaningfulLabel(label)) continue;
         if (title && norm(label) === norm(title)) continue;
-        items.push(buildItem(label, { criteria: row[best + 1] || null }));
+        put("", buildItem(label, { criteria: row[best + 1] || null }));
       }
     }
   }
 
-  if (items.length === 0) return null;
-  return {
-    name: norm(title ?? fallbackName).slice(0, IMPORT_LIMITS.maxNameLen),
-    description: `「${source}」から取り込み`,
-    source,
-    items,
-  };
+  if (total() === 0) return [];
+
+  // 大分類が点検周期（日常点検 / 月点検）なら周期ごとに手順書を分ける。
+  // 周期は設備への割当（点検間隔）が別々になるため、1枚にまとめると運用できない。
+  const keys = [...buckets.keys()];
+  const splitByFreq = keys.length >= 2 && keys.every((k) => FREQ_RE.test(k));
+  const base = norm(subject || title || fallbackName);
+
+  if (splitByFreq) {
+    return keys.map((k) => ({
+      name: `${base} ${k}`.trim().slice(0, IMPORT_LIMITS.maxNameLen),
+      description: `「${source}」から取り込み（${k}）`,
+      source,
+      items: buckets.get(k) ?? [],
+    }));
+  }
+  const name = subject && title ? `${subject} ${title}` : base;
+  return [
+    {
+      name: name.slice(0, IMPORT_LIMITS.maxNameLen),
+      description: `「${source}」から取り込み`,
+      source,
+      items: [...buckets.values()].flat(),
+    },
+  ];
 }
 
 // ---- Excel（.xlsx / .xlsm） ----
@@ -236,32 +389,99 @@ function cellText(v: any): string {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/** シート名付きのグリッド群を手順書ドラフトに変換する（.xlsx / .xls 共通）。 */
+function sheetsToDrafts(sheets: { name: string; grid: string[][] }[], filename: string): ProcedureDraft[] {
+  const base = filename.replace(/\.[^.]+$/, "");
+  const drafts: ProcedureDraft[] = [];
+  for (const sheet of sheets) {
+    const compact = sheet.grid.filter((r) => r && r.some((c) => c && c.trim()));
+    if (compact.length === 0) continue;
+    const name = sheet.name.trim();
+    const genericSheet = /^Sheet\s*\d*$/i.test(name);
+    const fallbackName = genericSheet ? base : sheets.length > 1 ? `${base} ${name}` : name;
+    const source = genericSheet ? filename : `${filename} / ${name}`;
+    drafts.push(...parseGrid(compact, fallbackName, source));
+  }
+  return drafts;
+}
+
 export async function parseExcel(buffer: Buffer, filename: string): Promise<ProcedureDraft[]> {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as unknown as ArrayBuffer);
-  const base = filename.replace(/\.[^.]+$/, "");
-  const drafts: ProcedureDraft[] = [];
-  const sheets = wb.worksheets.slice(0, IMPORT_LIMITS.maxSheets);
-  for (const ws of sheets) {
+  const sheets: { name: string; grid: string[][] }[] = [];
+  for (const ws of wb.worksheets.slice(0, IMPORT_LIMITS.maxSheets)) {
     if (ws.state && ws.state !== "visible") continue;
     const grid: string[][] = [];
     ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       const cells: string[] = [];
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        // ExcelJS は結合セルの子セルにも親の値を返す。そのままだと
+        // 「日常点検」のような大分類が全行に埋まって項目名列と区別できないため、
+        // 先頭セル以外は空にして SheetJS(.xls) と同じ形に揃える。
+        if (cell.isMerged && cell.master && cell.master.address !== cell.address) {
+          cells[colNumber - 1] = "";
+          return;
+        }
         cells[colNumber - 1] = cellText(cell.value);
       });
       grid[rowNumber - 1] = cells;
     });
-    const compact = grid.filter((r) => r && r.some((c) => c && c.trim()));
-    if (compact.length === 0) continue;
-    const genericSheet = /^Sheet\s*\d*$/i.test(ws.name.trim());
-    const fallbackName = genericSheet ? base : sheets.length > 1 ? `${base} ${ws.name}` : ws.name;
-    const source = genericSheet ? filename : `${filename} / ${ws.name}`;
-    const draft = parseGrid(compact, fallbackName, source);
-    if (draft) drafts.push(draft);
+    sheets.push({ name: ws.name, grid });
   }
-  return drafts;
+  return sheetsToDrafts(sheets, filename);
+}
+
+// ---- 旧形式 Excel（.xls / BIFF） ----
+
+/**
+ * SheetJS(xlsx) は npm 公開が 0.18.5 で止まっており、細工したファイルで
+ * プロトタイプ汚染が起きうる（CVE-2023-30533。修正版は CDN 配布のみ）。
+ * 解析の前後で Object/Array.prototype に増えたプロパティを取り除き、
+ * 汚染をリクエストの外へ持ち出さない。XLSX の読み取りは同期処理なので、
+ * この区間に他のリクエストの処理が割り込むことはない。
+ */
+function withPrototypeGuard<T>(fn: () => T): T {
+  const targets: object[] = [Object.prototype, Array.prototype];
+  const before = targets.map((t) => new Set(Object.getOwnPropertyNames(t)));
+  try {
+    return fn();
+  } finally {
+    targets.forEach((t, i) => {
+      for (const key of Object.getOwnPropertyNames(t)) {
+        if (before[i].has(key)) continue;
+        try {
+          delete (t as Record<string, unknown>)[key];
+        } catch {
+          /* 消せなければ諦める（再定義不可なら書き換えも起きていない） */
+        }
+      }
+    });
+  }
+}
+
+/**
+ * 旧形式の .xls（Excel 97-2003 / BIFF）を読む。ExcelJS は .xlsx 専用のため
+ * SheetJS を使う。結合セルは先頭以外が空セルになるので、
+ * parseGrid 側の大分類・中分類の持ち回りがそのまま効く。
+ */
+export async function parseXls(buffer: Buffer, filename: string): Promise<ProcedureDraft[]> {
+  const XLSX = await import("xlsx");
+  const sheets = withPrototypeGuard(() => {
+    const wb = XLSX.read(buffer, { type: "buffer", cellDates: true, cellFormula: false, cellHTML: false });
+    const visible = (i: number) => (wb.Workbook?.Sheets?.[i]?.Hidden ?? 0) === 0;
+    const out: { name: string; grid: string[][] }[] = [];
+    wb.SheetNames.forEach((name, i) => {
+      if (out.length >= IMPORT_LIMITS.maxSheets) return;
+      if (!visible(i)) return;
+      const ws = wb.Sheets[name];
+      if (!ws) return;
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: "" });
+      out.push({ name, grid: rows.map((r) => (r ?? []).map((c) => (c == null ? "" : String(c)))) });
+    });
+    return out;
+  });
+  return sheetsToDrafts(sheets, filename);
 }
 
 // ---- CSV ----
@@ -296,8 +516,7 @@ export function parseCsv(buffer: Buffer, filename: string): ProcedureDraft[] {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const grid = parseCsvText(text).filter((r) => r.some((c) => c.trim()));
   if (grid.length === 0) return [];
-  const draft = parseGrid(grid, filename.replace(/\.[^.]+$/, ""), filename);
-  return draft ? [draft] : [];
+  return parseGrid(grid, filename.replace(/\.[^.]+$/, ""), filename);
 }
 
 // ---- PDF ----
@@ -395,11 +614,11 @@ export async function parseImportFile(filename: string, buffer: Buffer): Promise
       return parseExcel(buffer, filename);
     case "csv":
       return parseCsv(buffer, filename);
+    case "xls":
+      return parseXls(buffer, filename);
     case "pdf":
       return parsePdf(buffer, filename);
-    case "xls":
-      throw new Error("旧形式の .xls は取り込めません。Excelで .xlsx 形式に保存し直してください");
     default:
-      throw new Error("対応していないファイル形式です（.xlsx / .xlsm / .csv / .pdf に対応）");
+      throw new Error("対応していないファイル形式です（.xlsx / .xlsm / .xls / .csv / .pdf に対応）");
   }
 }
