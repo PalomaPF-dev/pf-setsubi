@@ -11,7 +11,7 @@ export default function LogoutLink({
   className?: string;
 }) {
   return (
-    <button type="button" onClick={() => { void signOut({ redirect: false }).then(() => { window.location.href = "https://portal.paloma-pf.com/"; }); }} className={className}>
+    <button type="button" onClick={() => { void signOut({ redirect: false }).then(() => { window.location.href = "https://portal.paloma-pf.com/?logout=1"; }); }} className={className}>
       {label}
     </button>
   );
