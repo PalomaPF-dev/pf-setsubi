@@ -1464,35 +1464,8 @@ export async function updateManagementNoSettings(
     WHERE id = ${companyId}`;
 }
 
-// ===== 承認ワークフロー設定（承認者メール） =====
-
-export interface ApprovalSettings {
-  /** 点検完了→承認依頼の宛先。空なら会社の全ユーザーに通知 */
-  approverEmail: string | null;
-}
-
-export async function getApprovalSettings(companyId: string): Promise<ApprovalSettings> {
-  await ensureSchema();
-  const sql = getSql();
-  const rows = await sql`
-    SELECT approver_email FROM companies WHERE id = ${companyId} LIMIT 1`;
-  const r = rows[0];
-  return {
-    approverEmail: r?.approver_email ?? null,
-  };
-}
-
-export async function updateApprovalSettings(
-  companyId: string,
-  settings: ApprovalSettings
-): Promise<void> {
-  await ensureSchema();
-  const sql = getSql();
-  await sql`
-    UPDATE companies SET
-      approver_email = ${settings.approverEmail}
-    WHERE id = ${companyId}`;
-}
+// 承認者はポータルのユーザー設定が正のため、アプリ内に設定機能は持たない。
+// 承認依頼メールの宛先解決は listApproverEmails / designatedApproverEmailForUser を参照。
 
 // ===== 作業者（users の role='worker'。ポータルで発行される作業者アカウント） =====
 // 旧 workers テーブル（名前だけの名簿）は廃止（データは残置）。読み出し元を users に切り替えた。

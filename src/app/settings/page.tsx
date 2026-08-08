@@ -1,15 +1,13 @@
-import { ChevronUp, ChevronDown, Trash2, Factory, Plus, MapPinned, ShieldCheck } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Factory, Plus, MapPinned } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getUserRoleAndFactory } from "@/lib/authDb";
 import {
   getManagementNoSettings,
-  getApprovalSettings,
   listCustomFieldDefs,
   listSitesWithAreas,
 } from "@/lib/db";
 import {
   updateManagementNoSettingsAction,
-  updateApprovalSettingsAction,
   createCustomFieldDefAction,
   deleteCustomFieldDefAction,
   moveCustomFieldDefAction,
@@ -38,11 +36,10 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const { companyId, userId } = await requireEntitledSession();
 
-  let s, approval, defs, sites, rf;
+  let s, defs, sites, rf;
   try {
-    [s, approval, defs, sites, rf] = await Promise.all([
+    [s, defs, sites, rf] = await Promise.all([
       getManagementNoSettings(companyId),
-      getApprovalSettings(companyId),
       listCustomFieldDefs(companyId),
       listSitesWithAreas(companyId),
       getUserRoleAndFactory(userId),
@@ -58,10 +55,10 @@ export default async function SettingsPage() {
   }
 
   const preview = `${s.prefix}-${String(s.seq).padStart(s.digits, "0")}`;
-  // マスタ設定（採番・承認・カスタム項目・工場/職場）は管理者のみ編集可
+  // マスタ設定（採番・カスタム項目・工場/職場）は管理者のみ編集可
   const isAdmin = (rf?.role ?? "admin") === "admin";
-  // 所属工場による表示制限ユーザーには、工場・職場の一覧も自工場のみ見せる
-  const restrictedFactory = rf && rf.role !== "admin" ? rf.factory : null;
+  // 所属工場のあるユーザーには、工場・職場の一覧も自工場のみ見せる（管理者も同じ＝役割では緩めない）
+  const restrictedFactory = rf?.factory ?? null;
   if (restrictedFactory) {
     sites = sites.filter((site) => site.name === restrictedFactory);
   }
@@ -70,7 +67,7 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
       <PageHeader
         title="設定"
-        description="採番ルール・承認ワークフロー・カスタム項目・工場/職場を設定します"
+        description="採番ルール・カスタム項目・工場/職場を設定します（承認者・アカウントはポータルで管理します）"
       />
 
       <div className="flex flex-col gap-6">
@@ -146,37 +143,8 @@ export default async function SettingsPage() {
           </form>
         </div>
 
-        {/* 承認ワークフロー */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="mb-1 flex items-center gap-1.5 text-sm font-bold text-slate-700">
-            <ShieldCheck className="h-4 w-4 text-orange-500" />
-            承認ワークフロー
-          </h2>
-          <p className="mb-4 text-xs text-slate-400">
-            点検が実施されると「承認待ち」になり、承認者へメールで結果が届きます。承認すると点検完了、差し戻すと
-            再点検対象に戻ります。
-          </p>
-
-          <form action={updateApprovalSettingsAction} className="flex flex-col gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">承認者メール</label>
-              <input
-                name="approverEmail"
-                type="text"
-                defaultValue={approval.approverEmail ?? ""}
-                placeholder="例: kanri@example.com（複数はカンマ区切り）"
-                className={inputCls}
-              />
-              <p className="mt-1 text-xs text-slate-400">
-                点検完了時に承認依頼メールを送る宛先。空欄の場合は社内の全ユーザーに送信します。
-              </p>
-            </div>
-
-            <div>
-              <SubmitButton pendingText="保存中…">承認設定を保存</SubmitButton>
-            </div>
-          </form>
-        </div>
+        {/* 承認者はポータルのユーザー設定が正のため、アプリ内では設定しない
+            （点検完了時の承認依頼メールは、ポータル連携の承認者へ自動で送られる） */}
 
         {/* カスタム項目管理 */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5">

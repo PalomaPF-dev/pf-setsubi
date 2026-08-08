@@ -4,14 +4,14 @@ import { ensureSchema } from "./schema";
 /**
  * 工場スコープ（ユーザーの所属工場によるデータ表示制限）。
  *
- * ルール:
- * - 管理者（role='admin'）は常に全工場を閲覧できる。
- * - users.factory が NULL（未設定）のユーザー（本部スタッフ等）も全工場を閲覧できる。
- * - それ以外（一般ユーザー ＋ factory 設定あり）は「所属工場のデータのみ」表示。
+ * ルール（**役割では緩めない**。所属工場が基準）:
+ * - users.factory が設定されているユーザーは「所属工場のデータのみ」表示。
+ *   **管理者も同じ＝自分の工場だけ**。
+ * - users.factory が NULL（未設定）のユーザー（ポータル管理者・本部スタッフ等）は全工場を閲覧できる。
  *   照合は sites.name と users.factory の名称一致（sites は company 内で名前一意）。
  */
 export interface FactoryScope {
-  /** 表示制限の対象か（role!=='admin' かつ factory 設定あり） */
+  /** 表示制限の対象か（factory 設定あり） */
   restricted: boolean;
   /** users.factory の値（未設定は null）。制限ユーザーの「所属: ◯◯」表示に使う */
   factoryName: string | null;
@@ -19,7 +19,7 @@ export interface FactoryScope {
   siteId: string | null;
 }
 
-/** 無制限スコープ（管理者・factory 未設定ユーザー相当）。 */
+/** 無制限スコープ（factory 未設定ユーザー相当）。 */
 export const UNRESTRICTED_SCOPE: FactoryScope = {
   restricted: false,
   factoryName: null,
@@ -34,7 +34,7 @@ const NO_MATCH_SITE_ID = "00000000-0000-0000-0000-000000000000";
 
 /**
  * ログインユーザーの工場スコープを1クエリで解決する。
- * role・factory・（名称一致する）sites.id を同時に取得。
+ * factory・（名称一致する）sites.id を同時に取得する。
  */
 export async function getFactoryScope(
   companyId: string,
@@ -43,7 +43,7 @@ export async function getFactoryScope(
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT u.role, u.factory, s.id AS site_id
+    SELECT u.factory, s.id AS site_id
     FROM users u
     LEFT JOIN sites s ON s.company_id = u.company_id AND s.name = u.factory
     WHERE u.id = ${userId} AND u.company_id = ${companyId}
@@ -51,7 +51,7 @@ export async function getFactoryScope(
   const r = rows[0];
   if (!r) return UNRESTRICTED_SCOPE;
   const factory = ((r.factory as string | null) ?? "").trim() || null;
-  const restricted = r.role !== "admin" && factory != null;
+  const restricted = factory != null;
   return {
     restricted,
     factoryName: factory,
