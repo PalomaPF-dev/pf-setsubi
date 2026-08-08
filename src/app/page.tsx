@@ -7,9 +7,6 @@ import {
   ClipboardCheck,
   Plus,
   Wrench,
-  Sparkles,
-  CheckCircle2,
-  Circle,
 } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getUserApprovalRouting } from "@/lib/authDb";
@@ -121,42 +118,6 @@ export default async function DashboardPage({
           </>
         }
       />
-
-      {/* はじめての設定（設備0件・点検記録0件＝登録直後）。空の「点検を開始」に迷い込む前に順路を示す */}
-      {counts.total === 0 && records.length === 0 && (
-        <section className="mb-6 rounded-2xl border-2 border-orange-200 bg-orange-50/60 p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-orange-800">
-            <Sparkles className="h-4 w-4" />
-            はじめての設定
-          </h2>
-          <p className="mt-1 text-xs text-orange-700/80">
-            設備点検をはじめるには、次の順で準備してください。
-          </p>
-          <ol className="mt-3 space-y-2">
-            <SetupStep
-              done={sites.length > 0}
-              label="① 工場・職場を登録する"
-              description="工場（拠点）とその配下の職場を登録すると、台帳・点検予定を工場/職場で絞り込めます"
-              href="/settings"
-              linkLabel="工場・職場へ"
-            />
-            <SetupStep
-              done={counts.total > 0}
-              label="② 設備を登録する"
-              description="点検したい機械・設備を台帳に登録します"
-              href="/equipment/new"
-              linkLabel="設備を登録"
-            />
-            <SetupStep
-              done={false}
-              label="③ 点検手順書を作成する"
-              description="テンプレート8種から選ぶだけでも作れます。設備に割り当てて点検を開始します"
-              href="/checklists/new"
-              linkLabel="手順書を作成"
-            />
-          </ol>
-        </section>
-      )}
 
       {/* 工場/職場での絞り込み（工場が未登録なら SiteFilter 側で非表示。制限ユーザーは所属工場に固定） */}
       {(sites.length > 0 || lockedSiteName) && (
@@ -311,39 +272,6 @@ export default async function DashboardPage({
         </section>
       </div>
     </div>
-  );
-}
-
-function SetupStep({
-  done,
-  label,
-  description,
-  href,
-  linkLabel,
-}: {
-  done: boolean;
-  label: string;
-  description: string;
-  href: string;
-  linkLabel: string;
-}) {
-  return (
-    <li className="flex flex-wrap items-center gap-3 rounded-xl border border-orange-100 bg-white px-3 py-2.5">
-      {done ? (
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-      ) : (
-        <Circle className="h-5 w-5 shrink-0 text-slate-300" />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className={`text-sm font-semibold ${done ? "text-slate-400 line-through" : "text-slate-800"}`}>{label}</div>
-        <div className="text-xs text-slate-400">{description}</div>
-      </div>
-      {!done && (
-        <Link href={href} className="shrink-0 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-700">
-          {linkLabel}
-        </Link>
-      )}
-    </li>
   );
 }
 
