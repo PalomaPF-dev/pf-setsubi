@@ -55,6 +55,7 @@ import {
   createProcedureWithItems,
   updateManagementNoSettings,
   createSite,
+  listSites,
   updateSite,
   moveSite,
   deleteSite,
@@ -320,6 +321,17 @@ export async function moveCustomFieldDefAction(id: string, dir: "up" | "down"): 
 
 // ===== 点検手順書 =====
 
+/**
+ * フォームの siteId を検証して返す（作成工場）。
+ * "" / "shared" は共通（null）。他社の工場IDを差し込まれないよう自社の工場マスタで確認する。
+ */
+async function readProcedureSiteId(companyId: string, fd: FormData): Promise<string | null> {
+  const raw = strOrNull(fd, "siteId");
+  if (!raw || raw === "shared") return null;
+  const sites = await listSites(companyId);
+  return sites.some((s) => s.id === raw) ? raw : null;
+}
+
 export async function createProcedureAction(fd: FormData): Promise<void> {
   const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
@@ -327,6 +339,7 @@ export async function createProcedureAction(fd: FormData): Promise<void> {
   const id = await createProcedure(companyId, {
     name,
     description: strOrNull(fd, "description"),
+    siteId: await readProcedureSiteId(companyId, fd),
   });
   revalidatePath("/checklists");
   redirect(`/checklists/${id}`);
@@ -339,6 +352,7 @@ export async function updateProcedureAction(id: string, fd: FormData): Promise<v
   await updateProcedure(companyId, id, {
     name,
     description: strOrNull(fd, "description"),
+    siteId: await readProcedureSiteId(companyId, fd),
   });
   revalidatePath("/checklists");
   revalidatePath(`/checklists/${id}`);
@@ -963,11 +977,11 @@ export async function deleteCorrectiveActionAction(id: string, equipmentId: stri
 // ===== 手順書テンプレート =====
 
 /** テンプレートから手順書+項目を一括作成（key はサーバー側で解決するため改ざん不能）。 */
-export async function createProcedureFromTemplateAction(key: string): Promise<void> {
+export async function createProcedureFromTemplateAction(key: string, fd: FormData): Promise<void> {
   const { companyId } = await requireAdminSession();
   const tpl = getProcedureTemplate(key);
   if (!tpl) throw new Error("テンプレートが見つかりません");
-  const id = await createProcedureFromTemplate(companyId, tpl);
+  const id = await createProcedureFromTemplate(companyId, tpl, await readProcedureSiteId(companyId, fd));
   revalidatePath("/checklists");
   redirect(`/checklists/${id}`);
 }
@@ -977,6 +991,8 @@ export async function createProcedureFromTemplateAction(key: string): Promise<vo
 export interface ImportProcedurePayload {
   name: string;
   description?: string | null;
+  /** 作成工場（sites.id）。未指定・不正値は全工場共通として扱う */
+  siteId?: string | null;
   items: {
     label: string;
     itemType: string;
@@ -1005,6 +1021,8 @@ export async function importProceduresAction(
   if (payload.length > MAX_IMPORT_PROCEDURES) {
     throw new Error(`一度に取り込めるのは ${MAX_IMPORT_PROCEDURES} 件までです`);
   }
+  // 他社の工場IDを差し込まれないよう、自社の工場マスタで照合する
+  const siteIds = new Set((await listSites(companyId)).map((s) => s.id));
   const created: { id: string; name: string }[] = [];
   for (const draft of payload) {
     const name = String(draft.name ?? "").trim().slice(0, 120);
@@ -1029,9 +1047,11 @@ export async function importProceduresAction(
       })
       .filter((it) => it.label);
     if (items.length === 0) throw new Error(`「${name}」に点検項目がありません`);
+    const rawSite = draft.siteId ? String(draft.siteId) : null;
     const id = await createProcedureWithItems(companyId, {
       name,
       description: draft.description ? String(draft.description).trim().slice(0, 500) || null : null,
+      siteId: rawSite && siteIds.has(rawSite) ? rawSite : null,
       items,
     });
     created.push({ id, name });

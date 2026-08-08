@@ -6,6 +6,8 @@ import { FileUp, Camera } from "lucide-react";
 import { createProcedureAction, createProcedureFromTemplateAction } from "@/lib/actions";
 import { PROCEDURE_TEMPLATES, type ProcedureTemplateItem } from "@/lib/procedureTemplates";
 import SubmitButton from "@/components/SubmitButton";
+import ProcedureSiteSelect from "@/components/ProcedureSiteSelect";
+import type { Site } from "@/lib/types";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500";
@@ -24,7 +26,14 @@ function numericRange(item: ProcedureTemplateItem): string | null {
   return `基準 ${item.min ?? ""}〜${item.max ?? ""}${unit}`;
 }
 
-export default function NewChecklistTabs() {
+export default function NewChecklistTabs({
+  sites,
+  defaultSiteId,
+}: {
+  sites: Site[];
+  /** 作成者の所属工場を初期値にする（本部スタッフ・管理者は共通） */
+  defaultSiteId: string | null;
+}) {
   const [tab, setTab] = useState<"blank" | "template">("blank");
 
   const tabCls = (active: boolean) =>
@@ -89,6 +98,7 @@ export default function NewChecklistTabs() {
               className={inputCls}
             />
           </div>
+          <ProcedureSiteSelect sites={sites} defaultSiteId={defaultSiteId} className={inputCls} />
           <SubmitButton pendingText="作成中…" className="h-11">
             作成して項目を編集
           </SubmitButton>
@@ -140,7 +150,15 @@ export default function NewChecklistTabs() {
                   })}
                 </ul>
               </details>
-              <form action={createProcedureFromTemplateAction.bind(null, tpl.key)} className="mt-auto pt-3">
+              <form
+                action={createProcedureFromTemplateAction.bind(null, tpl.key)}
+                className="mt-auto flex flex-col gap-2 pt-3"
+              >
+                <ProcedureSiteSelect
+                  sites={sites}
+                  defaultSiteId={defaultSiteId}
+                  className={inputCls}
+                />
                 <SubmitButton pendingText="作成中…" className="w-full">
                   このテンプレートで作成
                 </SubmitButton>

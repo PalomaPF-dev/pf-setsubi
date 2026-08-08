@@ -1,13 +1,22 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
+import { listSites } from "@/lib/db";
+import { getFactoryScope } from "@/lib/factoryScope";
 import PageHeader from "@/components/PageHeader";
 import ChecklistImportClient from "@/components/ChecklistImportClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChecklistImportPage() {
-  await requireAdminPage();
+  const session = await requireAdminPage();
+  const [sites, scope] = await Promise.all([
+    listSites(session.companyId),
+    getFactoryScope(session.companyId, session.userId),
+  ]);
+  // 取り込み元の点検表は工場ごとの帳票が多いので、所属工場を初期値にする
+  const defaultSiteId =
+    sites.find((s) => scope.factoryName != null && s.name === scope.factoryName)?.id ?? null;
   return (
     <div className="mx-auto max-w-4xl p-4 sm:p-6">
       <Link
@@ -21,7 +30,7 @@ export default async function ChecklistImportPage() {
         title="点検表ファイルから取り込み"
         description="既存の点検表（Excel / PDF / CSV）を解析して手順書テンプレートを自動作成します"
       />
-      <ChecklistImportClient />
+      <ChecklistImportClient sites={sites} defaultSiteId={defaultSiteId} />
     </div>
   );
 }

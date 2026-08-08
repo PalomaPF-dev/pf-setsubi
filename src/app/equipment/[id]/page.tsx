@@ -368,7 +368,8 @@ export default async function EquipmentDetailPage({
                       </option>
                       {availableProcedures.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name}（{p.itemCount ?? 0}項目）
+                          {/* 他工場の手順書もそのまま割当できるので、どの工場のものか併記する */}
+                          [{p.siteName ?? "共通"}] {p.name}（{p.itemCount ?? 0}項目）
                         </option>
                       ))}
                     </select>
