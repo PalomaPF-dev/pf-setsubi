@@ -57,9 +57,9 @@ export default async function HelpPage() {
           <Step n={2} title="管理番号の採番ルール">
             「管理番号 採番ルール」でプレフィックス・桁数を設定すると、設備登録時に「自動採番」で番号を発番できます。
           </Step>
-          <Step n={3} title="承認ワークフロー（承認者メール・作業者名簿）">
-            「承認ワークフロー」で、点検完了を承認する<strong>承認者のメール</strong>と、点検開始時に選ぶ
-            <strong>作業者名簿</strong>を登録します。
+          <Step n={3} title="承認者を確認（ポータル）">
+            点検完了を承認する<strong>承認者</strong>は<strong>ポータルのユーザー設定</strong>で管理します。
+            職場の管理者が既定の承認者になり、アプリへ自動で連携されます。
           </Step>
           <Step n={4} title="点検手順書を作成">
             <Link href="/checklists" className="font-medium text-orange-700 hover:underline">
@@ -188,7 +188,7 @@ export default async function HelpPage() {
               <strong>点検時に「どこを見るか」が出ない</strong> … 手順書の各項目に「点検箇所の写真」または「点検部位マップ」を登録すると表示されます。
             </li>
             <li>
-              <strong>承認依頼メールが届かない</strong> … 設定「承認ワークフロー」で承認者メールを登録してください（メール配信の有効化には別途サーバー設定が必要な場合があります）。
+              <strong>承認依頼メールが届かない</strong> … ポータルのユーザー設定で承認者とそのメールアドレスが登録されているかご確認ください（メール配信の有効化には別途サーバー設定が必要な場合があります）。
             </li>
           </ul>
         </div>

@@ -43,8 +43,6 @@ import {
   designatedApproverEmailForUser,
   canActorApproveRecord,
   getRecordWithResults,
-  getApprovalSettings,
-  updateApprovalSettings,
   createCorrectiveAction,
   updateCorrectiveAction,
   resolveCorrectiveAction,
@@ -859,14 +857,7 @@ export async function updateManagementNoSettingsAction(fd: FormData): Promise<vo
   revalidatePath("/settings");
 }
 
-// ===== 承認ワークフロー設定（承認者メール） =====
-
-export async function updateApprovalSettingsAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  const approverEmail = strOrNull(fd, "approverEmail");
-  await updateApprovalSettings(companyId, { approverEmail });
-  revalidatePath("/settings");
-}
+// 承認者はポータルのユーザー設定が正のため、アプリ内に設定アクションは持たない。
 
 // ===== 処置（NG項目への是正対応） =====
 
