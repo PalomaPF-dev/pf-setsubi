@@ -296,6 +296,16 @@ async function buildSchema(): Promise<void> {
   // 点検箇所の写真（項目につき1枚）
   await safeDdl(() => sql`ALTER TABLE inspection_items ADD COLUMN IF NOT EXISTS spot_photo_url TEXT`);
 
+  // 手順書を作成した工場。NULL = 全工場共通。
+  // 閲覧・設備への割当は工場を問わず可能で、これは分類・絞り込みのためのラベル。
+  // 工場を削除しても手順書は残す（共通扱いに戻る）。
+  await safeDdl(() => sql`
+    ALTER TABLE inspection_procedures ADD COLUMN IF NOT EXISTS site_id UUID
+      REFERENCES sites(id) ON DELETE SET NULL`);
+  await safeDdl(
+    () => sql`CREATE INDEX IF NOT EXISTS procedures_site_idx ON inspection_procedures(site_id)`
+  );
+
   // 点検部位マップ: 手順書に写真/図面、各項目に図面上のピン座標（% 0-100、未配置は NULL）
   await safeDdl(() => sql`ALTER TABLE inspection_procedures ADD COLUMN IF NOT EXISTS diagram_url TEXT`);
   await safeDdl(() => sql`ALTER TABLE inspection_items ADD COLUMN IF NOT EXISTS map_x NUMERIC(6,3)`);

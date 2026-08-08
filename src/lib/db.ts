@@ -112,6 +112,8 @@ function mapProcedure(r: any): InspectionProcedure {
     name: r.name,
     description: r.description ?? null,
     archived: Boolean(r.archived),
+    siteId: r.site_id ?? null,
+    siteName: r.site_name ?? null,
     diagramUrl: r.diagram_url ?? null,
     createdAt: tsStr(r.created_at),
     updatedAt: tsStr(r.updated_at),
@@ -553,9 +555,15 @@ export async function deleteDocument(companyId: string, id: string): Promise<voi
 // ===== 点検手順書 =====
 
 /** 手順書一覧（項目数・割当設備数・記録数付き）。既定ではアーカイブ済みを除く。 */
+/**
+ * 手順書一覧の工場での絞り込み。
+ * undefined = 全工場ぶん / "shared" = 全工場共通のみ / sites.id = その工場のみ。
+ */
+export type ProcedureSiteFilter = "shared" | (string & {});
+
 export async function listProcedures(
   companyId: string,
-  opts?: { includeArchived?: boolean; search?: string }
+  opts?: { includeArchived?: boolean; search?: string; siteFilter?: ProcedureSiteFilter }
 ): Promise<InspectionProcedure[]> {
   await ensureSchema();
   const sql = getSql();
@@ -564,13 +572,18 @@ export async function listProcedures(
   // LIKE のワイルドカード（% _ \）は打ち消して、入力文字そのものを探す。
   const term = opts?.search?.trim();
   const like = term ? `%${term.replace(/[\\%_]/g, "\\$&")}%` : null;
+  // 工場での絞り込み。"shared" = 共通のみ、UUID = その工場のみ（共通は含めない）。
+  // 表示制限ではなく分類なので、既定（undefined）は全工場ぶんを返す。
+  const onlyShared = opts?.siteFilter === "shared";
+  const siteId = opts?.siteFilter && opts.siteFilter !== "shared" ? opts.siteFilter : null;
   const rows = await sql`
-    SELECT p.*,
+    SELECT p.*, s.name AS site_name,
       (SELECT COUNT(*) FROM inspection_items i
         WHERE i.procedure_id = p.id AND i.archived = false) AS item_count,
       (SELECT COUNT(*) FROM equipment_procedures ep WHERE ep.procedure_id = p.id) AS assigned_count,
       (SELECT COUNT(*) FROM inspection_records r WHERE r.procedure_id = p.id) AS record_count
     FROM inspection_procedures p
+    LEFT JOIN sites s ON s.id = p.site_id
     WHERE p.company_id = ${companyId} AND (${includeArchived} OR p.archived = false)
       AND (${like}::text IS NULL
            OR p.name ILIKE ${like}
@@ -578,6 +591,8 @@ export async function listProcedures(
            OR EXISTS (SELECT 1 FROM inspection_items i
                       WHERE i.procedure_id = p.id AND i.archived = false
                         AND i.label ILIKE ${like}))
+      AND (NOT ${onlyShared} OR p.site_id IS NULL)
+      AND (${siteId}::uuid IS NULL OR p.site_id = ${siteId}::uuid)
     ORDER BY p.archived ASC, p.created_at DESC`;
   return rows.map(mapProcedure);
 }
@@ -589,22 +604,23 @@ export async function getProcedure(
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT p.*,
+    SELECT p.*, s.name AS site_name,
       (SELECT COUNT(*) FROM inspection_records r WHERE r.procedure_id = p.id) AS record_count
     FROM inspection_procedures p
+    LEFT JOIN sites s ON s.id = p.site_id
     WHERE p.company_id = ${companyId} AND p.id = ${id} LIMIT 1`;
   return rows[0] ? mapProcedure(rows[0]) : null;
 }
 
 export async function createProcedure(
   companyId: string,
-  input: { name: string; description?: string | null }
+  input: { name: string; description?: string | null; siteId?: string | null }
 ): Promise<string> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    INSERT INTO inspection_procedures (company_id, name, description)
-    VALUES (${companyId}, ${input.name}, ${input.description ?? null})
+    INSERT INTO inspection_procedures (company_id, name, description, site_id)
+    VALUES (${companyId}, ${input.name}, ${input.description ?? null}, ${input.siteId ?? null})
     RETURNING id`;
   return rows[0].id as string;
 }
@@ -612,13 +628,14 @@ export async function createProcedure(
 export async function updateProcedure(
   companyId: string,
   id: string,
-  input: { name: string; description?: string | null }
+  input: { name: string; description?: string | null; siteId?: string | null }
 ): Promise<void> {
   await ensureSchema();
   const sql = getSql();
   await sql`
     UPDATE inspection_procedures SET
-      name = ${input.name}, description = ${input.description ?? null}, updated_at = NOW()
+      name = ${input.name}, description = ${input.description ?? null},
+      site_id = ${input.siteId ?? null}, updated_at = NOW()
     WHERE company_id = ${companyId} AND id = ${id}`;
 }
 
@@ -1978,15 +1995,16 @@ export async function getItemResultContext(
  */
 export async function createProcedureFromTemplate(
   companyId: string,
-  tpl: ProcedureTemplate
+  tpl: ProcedureTemplate,
+  siteId?: string | null
 ): Promise<string> {
   await ensureSchema();
   const sql = getSql();
   const procedureId = crypto.randomUUID();
   await sql.transaction([
     sql`
-      INSERT INTO inspection_procedures (id, company_id, name, description)
-      VALUES (${procedureId}, ${companyId}, ${tpl.name}, ${tpl.description})`,
+      INSERT INTO inspection_procedures (id, company_id, name, description, site_id)
+      VALUES (${procedureId}, ${companyId}, ${tpl.name}, ${tpl.description}, ${siteId ?? null})`,
     ...tpl.items.map((it, i) => {
       const numeric = it.itemType === "numeric";
       const photoMode = it.itemType === "photo" ? "required" : it.photoMode ?? "none";
@@ -2011,6 +2029,8 @@ export async function createProcedureFromTemplate(
 export interface ProcedureWithItemsInput {
   name: string;
   description?: string | null;
+  /** 作成工場（null = 全工場共通） */
+  siteId?: string | null;
   items: Omit<InspectionItemInput, "procedureId">[];
 }
 
@@ -2027,8 +2047,9 @@ export async function createProcedureWithItems(
   const procedureId = crypto.randomUUID();
   await sql.transaction([
     sql`
-      INSERT INTO inspection_procedures (id, company_id, name, description)
-      VALUES (${procedureId}, ${companyId}, ${input.name}, ${input.description ?? null})`,
+      INSERT INTO inspection_procedures (id, company_id, name, description, site_id)
+      VALUES (${procedureId}, ${companyId}, ${input.name}, ${input.description ?? null},
+              ${input.siteId ?? null})`,
     ...input.items.map((it, i) => {
       const v = normalizeItemInput({ ...it, procedureId });
       return sql`

@@ -14,6 +14,7 @@ import { requireAdminPage } from "@/lib/session";
 import { getFactoryScope, isEquipmentSiteVisible } from "@/lib/factoryScope";
 import {
   getProcedure,
+  listSites,
   listInspectionItems,
   listAssignmentsForProcedure,
   listReferenceMediaForProcedure,
@@ -40,6 +41,7 @@ import DbErrorState from "@/components/DbErrorState";
 import SubmitButton from "@/components/SubmitButton";
 import ConfirmForm from "@/components/ConfirmForm";
 import ChecklistItemFields from "@/components/ChecklistItemEditor";
+import ProcedureSiteSelect from "@/components/ProcedureSiteSelect";
 import ChecklistItemMediaPanel from "@/components/ChecklistItemMediaPanel";
 import ProcedureDiagramUploadForm from "@/components/ProcedureDiagramUploadForm";
 import ProcedureDiagramEditor from "@/components/ProcedureDiagramEditor";
@@ -65,8 +67,9 @@ export default async function ChecklistDetailPage({
     Map<string, ItemReferenceMedia[]>,
   ];
   let scope;
+  let sites;
   try {
-    [data, scope] = await Promise.all([
+    [data, scope, sites] = await Promise.all([
       Promise.all([
         getProcedure(session.companyId, id),
         listInspectionItems(session.companyId, id),
@@ -74,6 +77,7 @@ export default async function ChecklistDetailPage({
         listReferenceMediaForProcedure(session.companyId, id),
       ]),
       getFactoryScope(session.companyId, session.userId),
+      listSites(session.companyId),
     ]);
   } catch (e) {
     console.error("[checklist detail]", e);
@@ -140,7 +144,7 @@ export default async function ChecklistDetailPage({
       )}
 
       <div className="flex flex-col gap-6">
-        {/* 名称・説明 */}
+        {/* 名称・説明・作成工場 */}
         <Card title="名称・説明">
           <form action={updateProcedureAction.bind(null, id)} className="rounded-xl bg-slate-50 p-3">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -157,10 +161,17 @@ export default async function ChecklistDetailPage({
               </LabeledField>
             </div>
             <div className="mt-3">
+              <ProcedureSiteSelect
+                sites={sites}
+                defaultSiteId={procedure.siteId}
+                className={inputCls}
+              />
+            </div>
+            <div className="mt-3">
               <SubmitButton pendingText="保存中…" className="!px-3 !py-1.5 text-xs">
                 <span className="inline-flex items-center gap-1">
                   <Save className="h-3.5 w-3.5" />
-                  名称・説明を保存
+                  内容を保存
                 </span>
               </SubmitButton>
             </div>

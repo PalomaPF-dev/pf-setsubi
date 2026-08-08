@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { importProceduresAction, type ImportProcedurePayload } from "@/lib/actions";
+import type { Site } from "@/lib/types";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500";
@@ -36,6 +37,8 @@ interface Draft {
   name: string;
   description: string | null;
   source: string;
+  /** 作成工場（null = 共通）。ドラフトごとに変えられる */
+  siteId: string | null;
   items: DraftItem[];
   /** プレビューで取り込み対象から外せる */
   included: boolean;
@@ -46,7 +49,13 @@ interface ParseError {
   reason: string;
 }
 
-export default function ChecklistImportClient() {
+export default function ChecklistImportClient({
+  sites,
+  defaultSiteId,
+}: {
+  sites: Site[];
+  defaultSiteId: string | null;
+}) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [parseErrors, setParseErrors] = useState<ParseError[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -78,10 +87,13 @@ export default function ChecklistImportClient() {
         return;
       }
       setParseErrors(data.errors ?? []);
-      const parsed: Draft[] = (data.drafts ?? []).map((d: Omit<Draft, "included">) => ({
-        ...d,
-        included: true,
-      }));
+      const parsed: Draft[] = (data.drafts ?? []).map(
+        (d: Omit<Draft, "included" | "siteId">) => ({
+          ...d,
+          siteId: defaultSiteId,
+          included: true,
+        })
+      );
       setDrafts((prev) => [...prev, ...parsed]);
       if (parsed.length === 0 && (data.errors ?? []).length === 0) {
         setError("点検項目を検出できませんでした");
@@ -128,6 +140,7 @@ export default function ChecklistImportClient() {
       const payload: ImportProcedurePayload[] = targets.map((d) => ({
         name: d.name,
         description: d.description,
+        siteId: d.siteId,
         items: d.items.map((it) => ({
           label: it.label,
           itemType: it.itemType,
@@ -289,6 +302,30 @@ export default function ChecklistImportClient() {
                       className={inputCls}
                       disabled={!d.included}
                     />
+                    {sites.length > 0 && (
+                      <div className="mt-2">
+                        <label className="mb-1 block text-xs font-medium text-slate-500">
+                          作成工場（全工場から閲覧・割当できます）
+                        </label>
+                        <select
+                          value={d.siteId ?? "shared"}
+                          onChange={(e) =>
+                            updateDraft(di, {
+                              siteId: e.target.value === "shared" ? null : e.target.value,
+                            })
+                          }
+                          className={inputCls}
+                          disabled={!d.included}
+                        >
+                          <option value="shared">共通（全工場）</option>
+                          {sites.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"

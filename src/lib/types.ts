@@ -137,6 +137,10 @@ export interface InspectionProcedure {
   name: string;
   description: string | null;
   archived: boolean;
+  /** 作成した工場（sites.id）。null = 全工場共通。閲覧・割当は工場を問わず可能 */
+  siteId: string | null;
+  /** 作成工場の名称（一覧表示用。共通は null） */
+  siteName: string | null;
   /** 点検部位マップの写真/図面（各項目をこの上にピン配置） */
   diagramUrl: string | null;
   createdAt: string;
