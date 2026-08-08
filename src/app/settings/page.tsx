@@ -37,7 +37,7 @@ const inputCls =
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const { companyId, userId, isDemo } = await requireEntitledSession();
+  const { companyId, userId } = await requireEntitledSession();
 
   let s, approval, defs, sites, rf;
   try {
@@ -420,8 +420,8 @@ export default async function SettingsPage() {
           </>
         )}
 
-        {/* 危険な操作（アカウント削除＝退会）。デモでは出さない */}
-        {!isDemo && <DeleteAccountSection />}
+        {/* 危険な操作（アカウント削除＝退会） */}
+        <DeleteAccountSection />
       </div>
     </div>
   );

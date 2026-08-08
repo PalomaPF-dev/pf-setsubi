@@ -17,7 +17,6 @@
 - next-auth v4（メール＋パスワード／JWT。クッキー名はアプリ固有 `setsubi.session-token` — localhost で他のPalomaアプリと衝突しないため）
 - Vercel Blob（写真・PDF保管） / Resend（メール） / Vercel Cron（定期実行） / Stripe（サブスク課金）
 - Tailwind CSS v4 / lucide-react / qrcode / html5-qrcode
-- Capacitor で iOS アプリ化（リモート読込方式。Paloma計測と同方式）
 
 ## セットアップ
 

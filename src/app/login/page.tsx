@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -29,7 +29,6 @@ function LoginInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
 
   // 戻る操作などでページが復元されたとき、押していないのに「ログイン中…」のまま
   // 表示される状態バグを防ぐ（bfcache 復元時にローディング状態をリセット）
@@ -37,7 +36,6 @@ function LoginInner() {
     const reset = (e: PageTransitionEvent) => {
       if (e.persisted) {
         setLoading(false);
-        setDemoLoading(false);
       }
     };
     window.addEventListener("pageshow", reset);
@@ -61,40 +59,6 @@ function LoginInner() {
     router.push(callbackUrl);
     router.refresh();
   }
-
-  /** 「ログインせずにデモを見る」: デモ会社を用意して即サインインする（社内紹介用）。 */
-  async function startDemo() {
-    setError("");
-    setDemoLoading(true);
-    try {
-      const res = await fetch("/api/demo", { method: "POST" });
-      if (!res.ok) throw new Error("demo setup failed");
-      const creds = (await res.json()) as { email: string; password: string };
-      const login = await signIn("credentials", {
-        email: creds.email,
-        password: creds.password,
-        redirect: false,
-      });
-      if (login?.error) throw new Error(login.error);
-      router.push("/");
-      router.refresh();
-    } catch {
-      setError("デモの準備に失敗しました。少し時間をおいて再度お試しください。");
-      setDemoLoading(false);
-    }
-  }
-
-  // ポータルの「サンプル事例」リンク（/login?demo=1）から来たときはデモを自動開始する。
-  // StrictMode の二重マウント等で多重起動しないよう ref でガードする。
-  const demoAutoStartedRef = useRef(false);
-  useEffect(() => {
-    if (searchParams.get("demo") !== "1") return;
-    if (demoAutoStartedRef.current || loading || demoLoading) return;
-    demoAutoStartedRef.current = true;
-    void startDemo();
-    // マウント時に一度だけ判定する
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f7f5]">
@@ -151,32 +115,12 @@ function LoginInner() {
             )}
             <button
               type="submit"
-              disabled={loading || demoLoading}
+              disabled={loading}
               className="w-full rounded-lg bg-[#f27524] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#c95e1a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "ログイン中…" : "ログイン"}
             </button>
           </form>
-
-          {/* 社内紹介用: サンプルデータ入りのデモ会社にワンクリックで入る（実データには影響しない） */}
-          <button
-            type="button"
-            onClick={startDemo}
-            disabled={loading || demoLoading}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2.5 text-sm font-semibold text-[#555555] transition-colors hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {demoLoading ? (
-              <>
-                <span
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#c9c9c9] border-t-transparent"
-                />
-                <span className="text-xs">デモの準備をしています（最大1分ほどかかります）</span>
-              </>
-            ) : (
-              "ログインせずにデモを見る"
-            )}
-          </button>
 
           {/* ポータル一括ログイン（ポータルでログイン済みなら各アプリは自動ログイン） */}
           <div className="mt-4 rounded-lg border border-[#f27524]/40 bg-[#fef3ec] px-3 py-2.5 text-center text-sm">

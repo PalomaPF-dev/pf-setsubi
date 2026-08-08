@@ -9,7 +9,6 @@ import { ensureSchema } from "./schema";
  * - users.factory が NULL（未設定）のユーザー（本部スタッフ等）も全工場を閲覧できる。
  * - それ以外（一般ユーザー ＋ factory 設定あり）は「所属工場のデータのみ」表示。
  *   照合は sites.name と users.factory の名称一致（sites は company 内で名前一意）。
- * - デモ（isDemo）ユーザーは factory 未設定で作成されるため従来どおり無制限。
  */
 export interface FactoryScope {
   /** 表示制限の対象か（role!=='admin' かつ factory 設定あり） */

@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// 通常の SSR ビルド（Vercel）。iOS は Capacitor のリモート読込でこのライブサイトを表示する。
+// 通常の SSR ビルド（Vercel）。
 // オンプレ Docker ビルド時のみ BUILD_STANDALONE=1 で standalone 出力（クラウドビルドには影響しない）。
 const nextConfig: NextConfig = {
   ...(process.env.BUILD_STANDALONE === "1" ? { output: "standalone" as const } : {}),
