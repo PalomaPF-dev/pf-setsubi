@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { CheckCircle2 } from "lucide-react";
 import ContactAdminModal from "@/components/ContactAdminModal";
 
 // useSearchParams はプリレンダー時に Suspense 境界が必要
@@ -23,7 +22,6 @@ function LoginInner() {
   const rawCallback = searchParams.get("callbackUrl") ?? "";
   const callbackUrl =
     rawCallback.startsWith("/") && !rawCallback.startsWith("//") ? rawCallback : "/";
-  const accountDeleted = searchParams.get("deleted") === "1";
 
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -73,14 +71,6 @@ function LoginInner() {
             <h1 className="text-xl font-bold text-[#333333]">PF設備管理</h1>
             <p className="mt-1 text-xs text-[#707070]">設備管理・点検システム</p>
           </div>
-
-          {/* アカウント削除（退会）完了の案内 */}
-          {accountDeleted && (
-            <div className="mb-4 flex items-start gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              アカウントを削除しました。ご利用ありがとうございました。
-            </div>
-          )}
 
           <h2 className="mb-6 text-lg font-semibold text-[#333333] after:mt-2 after:block after:h-[3px] after:w-8 after:rounded-full after:bg-[#f27524] after:content-['']">ログイン</h2>
 
