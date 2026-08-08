@@ -194,7 +194,7 @@ export default function ChecklistImportClient() {
         <div className="text-sm text-orange-800">
           <p className="font-medium">いま使っている点検表をそのまま取り込めます</p>
           <p className="mt-0.5 text-xs">
-            Excel（.xlsx / .xlsm）・PDF・CSV に対応。複数ファイル・複数シートをまとめて解析し、
+            Excel（.xlsx / .xlsm / .xls）・PDF・CSV に対応。複数ファイル・複数シートをまとめて解析し、
             点検項目や基準値（「0.4〜0.6MPa」「80℃以下」等）を自動で読み取ります。
           </p>
           <p className="mt-0.5 text-xs">
@@ -220,13 +220,13 @@ export default function ChecklistImportClient() {
           <p className="font-medium text-slate-600">
             {uploading ? "解析中…" : "点検表ファイルをドロップ（複数可）"}
           </p>
-          <p className="text-sm text-slate-400">またはクリックしてファイルを選択（.xlsx / .xlsm / .csv / .pdf）</p>
+          <p className="text-sm text-slate-400">またはクリックしてファイルを選択（.xlsx / .xlsm / .xls / .csv / .pdf）</p>
         </div>
         <input
           ref={fileRef}
           type="file"
           multiple
-          accept=".xlsx,.xlsm,.csv,.pdf,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".xlsx,.xlsm,.xls,.csv,.pdf,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           onChange={(e) => {
             if (e.target.files) handleFiles(e.target.files);
