@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import WebOnly from "@/components/WebOnly";
 
 /**
  * 初期セットアップ（初回だけの「管理者アカウント作成」）フォーム。
@@ -52,17 +51,7 @@ export default function InitialSetupForm() {
   }
 
   return (
-    <WebOnly
-      fallback={
-        <div className="text-center text-sm text-slate-600">
-          <p>初期セットアップはWeb版（ブラウザ）からお願いします。</p>
-          <p className="mt-3">
-            既にアカウントをお持ちの方は{" "}
-            <Link href="/login" className="font-medium text-[#f27524] hover:underline">ログイン</Link>
-          </p>
-        </div>
-      }
-    >
+    <>
       <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
         最初にこの管理者アカウントを1つだけ作成します。作成後は、この管理者が「設定」画面から
         社員のアカウントを発行します（この画面からの新規作成は今回かぎりです）。
@@ -94,7 +83,7 @@ export default function InitialSetupForm() {
           ログイン
         </Link>
       </p>
-    </WebOnly>
+    </>
   );
 }
 

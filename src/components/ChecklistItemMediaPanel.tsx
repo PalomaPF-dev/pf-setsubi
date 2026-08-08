@@ -16,7 +16,6 @@ import type { ItemReferenceMedia, MediaType } from "@/lib/types";
 import { MEDIA_TYPE_LABEL } from "@/lib/types";
 import { MAX_REFERENCE_MEDIA_PER_ITEM } from "@/lib/mediaLimits";
 import { compressImageFile } from "@/lib/imageCompress";
-import { captureFromNativeCamera } from "@/lib/capturePhoto";
 import { uploadMedia } from "@/lib/uploadMedia";
 import {
   setItemSpotPhotoAction,
@@ -95,14 +94,8 @@ export default function ChecklistItemMediaPanel({
     if (file) void uploadSpot(file);
   }
 
-  /** 「撮影する」。iOSアプリではカメラを直接起動し、それ以外は capture 付き input に委ねる。 */
-  async function onSpotCamera() {
-    const r = await captureFromNativeCamera();
-    if (r.status === "captured") {
-      void uploadSpot(r.file);
-      return;
-    }
-    if (r.status === "cancelled") return;
+  /** 「撮影する」。capture 付き input に委ねる（モバイルブラウザではカメラが起動する）。 */
+  function onSpotCamera() {
     spotCameraRef.current?.click();
   }
 
@@ -226,7 +219,7 @@ export default function ChecklistItemMediaPanel({
               <button
                 type="button"
                 disabled={spotBusy}
-                onClick={() => void onSpotCamera()}
+                onClick={onSpotCamera}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -248,7 +241,7 @@ export default function ChecklistItemMediaPanel({
             <button
               type="button"
               disabled={spotBusy}
-              onClick={() => void onSpotCamera()}
+              onClick={onSpotCamera}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-orange-700 text-sm font-semibold text-white hover:bg-orange-800 disabled:opacity-50"
             >
               {spotBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}

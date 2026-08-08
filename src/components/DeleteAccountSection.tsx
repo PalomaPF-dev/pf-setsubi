@@ -6,7 +6,7 @@ import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 
 /**
  * 設定画面 最下部の「危険な操作」ゾーン（アカウント削除＝退会）。
- * 確認欄に「削除」と入力しないと実行できない。デモでは呼び出し元で非表示にする。
+ * 確認欄に「削除」と入力しないと実行できない。
  */
 export default function DeleteAccountSection() {
   const [open, setOpen] = useState(false);

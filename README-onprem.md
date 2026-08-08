@@ -236,7 +236,6 @@ setsubi.example.co.jp {
 | 写真・PDF の保存 | Vercel Blob（推測不能 URL・無認証の公開配信） | **サーバー内の volume に保存**し、ログイン必須の `/api/files/` 経由で配信（社外へ出ません） |
 | アラートメール | Resend | 社内 SMTP（nodemailer） |
 | 定期実行 | Vercel Cron | cron サイドカーコンテナ |
-| デモ体験 | デモボタンあり | **デモボタンあり**（同様に使えます。デモ会社のデータは毎日のアラート実行時に自動清掃されます） |
 | データの所在 | クラウド | すべて社内サーバー内（db-data / uploads volume） |
 
 ---
