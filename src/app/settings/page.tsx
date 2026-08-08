@@ -29,7 +29,6 @@ import ConfirmForm from "@/components/ConfirmForm";
 import CustomFieldDefForm from "@/components/CustomFieldDefForm";
 import FactoryMapUploadForm from "@/components/FactoryMapUploadForm";
 import DbErrorState from "@/components/DbErrorState";
-import DeleteAccountSection from "@/components/DeleteAccountSection";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500";
@@ -419,9 +418,6 @@ export default async function SettingsPage() {
 
           </>
         )}
-
-        {/* 危険な操作（アカウント削除＝退会） */}
-        <DeleteAccountSection />
       </div>
     </div>
   );
