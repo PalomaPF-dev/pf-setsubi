@@ -369,8 +369,9 @@ async function buildSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS records_company_approval_idx
     ON inspection_records(company_id, approval_status, inspection_date DESC)`);
 
-  // 会社設定: 承認者メール（点検完了→承認依頼の宛先）＋作業者名簿（点検開始時に選択）
-  await safeDdl(() => sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS approver_email TEXT`);
+  // 承認者はポータルのユーザー設定が正のため、アプリ内に承認者メールの設定は持たない。
+  // 旧・承認者メールの列は不要になったため削除する（設定画面・更新関数とも撤去済み）。
+  await safeDdl(() => sql`ALTER TABLE companies DROP COLUMN IF EXISTS approver_email`);
   // (旧) companies.worker_roster JSONB は workers テーブルに置き換え。既存環境の互換のため残置。
   await safeDdl(() => sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS worker_roster JSONB NOT NULL DEFAULT '[]'::jsonb`);
 
